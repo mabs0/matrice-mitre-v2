@@ -140,7 +140,11 @@
     font-weight: 700;
     text-wrap: balance;
 }
-.hero h1 em { font-style: normal; color: var(--accent); }
+/* Le groupe de mots qui porte la promesse ne se coupe pas. Réparti sur deux
+   lignes, « maturité » d'un côté et « cyber » de l'autre, il cesse de se lire
+   d'un bloc — et c'est le seul endroit du titre où le sens tient à deux mots
+   collés. `balance` répartit les lignes autour de lui. */
+.hero h1 em { font-style: normal; color: var(--accent); white-space: nowrap; }
 
 .hero-lead {
     margin: 18px 0 0;
@@ -298,37 +302,6 @@
     border-color: var(--accent);
     box-shadow: 0 0 0 1px var(--accent), 0 2px 10px var(--accent-wash);
     color: var(--text);
-}
-
-/* ---------------------------------------------------------------- chiffres
-
-   Trois chiffres, sans boîte. Ils vivaient dans une grille cloisonnée de
-   bordures : le chiffre est déjà une forme forte, il n'a pas besoin d'un cadre.
-   Une seule ligne de séparation tient l'ensemble. */
-
-.home-figures {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: 14px 28px;
-    width: 100%;
-    max-width: 520px;
-    margin: clamp(30px, 4.5vw, 48px) 0 0;
-    padding-top: 22px;
-    border-top: 1px solid var(--border);
-}
-.figure { display: flex; flex-direction: column; gap: 2px; }
-.figure .v {
-    font-size: clamp(1.6rem, 3.2vw, 2.1rem);
-    font-weight: 300;
-    letter-spacing: -0.03em;
-    line-height: 1;
-    font-variant-numeric: tabular-nums;
-}
-.figure .k {
-    font-size: 0.68rem;
-    color: var(--text-mute);
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
 }
 
 /* ------------------------------------------------------------ deux actions
@@ -951,16 +924,12 @@
         margin: 0 auto;
     }
 
-    .home-figures { max-width: none; text-align: center; }
-    .figure { align-items: center; }
 }
 
 @media (max-width: 560px) {
     .wrap { padding: 0 16px; }
     .hero { padding-top: 92px; }
     .hero-chip em { display: none; }
-    .home-figures { grid-template-columns: repeat(3, 1fr); gap: 10px; max-width: none; }
-    .figure .k { font-size: 0.6rem; letter-spacing: 0.03em; }
     .action-card { padding: 20px; }
     .step { padding-left: 52px; }
     .step-num { width: 38px; height: 38px; font-size: 0.72rem; }

@@ -207,17 +207,26 @@ const home = window.document.getElementById("view-home");
 ok("accueil visible", !home.classList.contains("hidden"));
 ok("bouton « Créer un layer » présent", !!window.document.getElementById("home-new"));
 ok("zone d'import présente", !!window.document.getElementById("home-drop"));
-const stats = [...home.querySelectorAll(".figure .v")].map(n => n.textContent);
+// Les trois chiffres ont quitté le haut de page : ils meublaient sans rien
+// apprendre à qui arrive. Ce qu'ils vérifiaient, en revanche, reste vrai et se
+// vérifie à la source — sur le référentiel normalisé, pas sur le markup qui
+// l'affichait.
+//
 // T9999 n'a aucune relation ; T1555 en a une, mais vers T1555.001 qui n'existe
-// pas dans ce mini-bundle — elle doit être ignorée, donc deux techniques
-// se retrouvent sans mitigation.
-ok("chiffres calculés", stats.join("/") === "7/4/1", `mitigations/techniques/sous-techniques = ${stats.join("/")}`);
-ok("l'accueil ne montre plus les tactiques ni les techniques sans mitigation",
-   stats.length === 3 &&
-   !window.document.getElementById("view-home").querySelector(".home-figures")
-       .textContent.match(/tactique|sans mitigation/i));
-ok("relation vers une cible inexistante ignorée",
-   window.document.getElementById("view-home").textContent.includes("2"));
+// pas dans ce mini-bundle : elle doit être ignorée, donc deux techniques se
+// retrouvent sans mitigation.
+// `DONNEES` est le bundle réduit tel qu'il est écrit dans `attack-data.js` ;
+// les décomptes, eux, naissent de la normalisation. C'est elle qu'on interroge.
+const normalise = await (await import(`${APP}/js/attack.js`)).loadAttack();
+const compte = [normalise.counts.mitigations, normalise.counts.techniques,
+                normalise.counts.subTechniques].join("/");
+ok("chiffres calculés", compte === "7/4/1", `mitigations/techniques/sous-techniques = ${compte}`);
+// La relation de T1555 pointe vers T1555.001, absente du mini-bundle : elle doit
+// être ignorée plutôt que de créer une sous-technique fantôme.
+ok("relation vers une cible inexistante ignorée", normalise.counts.subTechniques === 1,
+   String(normalise.counts.subTechniques));
+ok("et le haut de page ne les affiche plus",
+   !home.querySelector(".home-figures") && !home.querySelector(".figure"));
 
 /* -------------------------------------------------------------- matrice vierge */
 
@@ -2154,14 +2163,10 @@ console.log("\n[30] Tenue sur écran étroit");
     ok("la FAQ ne reprend pas la silhouette du parcours",
        /\.faq-grid\s*\{\s*display:\s*block/.test(homeCss) &&
        !/\.faq-grid\s*\{[^}]*grid-template-columns/.test(homeCss));
-    // Les chiffres ont perdu leur grille cloisonnée : trois nombres posés, sans
-    // cadre. Sur écran étroit ils gardent une seule ligne — trois colonnes
-    // explicites, donc jamais de trou en fin de ligne à reboucher.
-    ok("les chiffres tiennent sur une ligne sur écran étroit",
-       /@media\s*\(max-width:\s*560px\)\s*\{[\s\S]*?\.home-figures\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*1fr\)/.test(homeCss));
-    ok("et ils ne sont plus enfermés dans une grille bordée",
-       !/\.home-stats/.test(homeCss) &&
-       !/\.home-figures\s*\{[^}]*background:\s*var\(--border\)/.test(homeCss));
+    // Le bloc de chiffres a été retiré du haut de page : plus une seule règle ne
+    // doit le viser, sans quoi il reviendrait au premier copier-coller.
+    ok("plus aucune mise en forme pour les chiffres retirés",
+       !/\.home-figures|\.home-stats|\.figure\b/.test(homeCss));
 
     // Les étapes sont empilées à toutes les largeurs, numéro à gauche du texte,
     // reliées par un filet vertical. Ce qui cède quand la place manque, c'est le
@@ -3417,7 +3422,64 @@ console.log("\n[42] Hauteurs d'en-tête, retour à l'accueil, tableau de bord au
     // plus spécifique que `#dash-side { display: contents }`.
     ok("le mode agrandi reste prioritaire sur la dissolution",
        /#dash\[data-expanded="matrix"\] #dash-side,[\s\S]{0,200}display:\s*none/.test(matrixCss));
+
+    /* --- la barre d'outil ne se chevauche plus ---
+
+       Cinq éléments à 430 px : marque, onglet du layer, sa croix, deux actions et
+       la bascule de thème. Le mot « MAPTRIX » cède, la mascotte reste — elle
+       suffit à désigner le retour à l'accueil, et c'est le même bouton. */
+    const baseCss = readFileSync(`${ROOT}/css/base.css`, "utf8");
+    const serre = /@media\s*\(max-width:\s*640px\)\s*\{([\s\S]*?)\n\}/.exec(baseCss)?.[1] ?? "";
+    ok("sur un écran étroit, la marque se réduit à sa mascotte",
+       /#topbar\[data-mode="app"\] \.brand\s*\{[^}]*font-size:\s*0/.test(serre) &&
+       /#topbar\[data-mode="app"\] \.brand-mascot\s*\{[^}]*font-size:/.test(serre),
+       serre.replace(/\s+/g, " ").slice(0, 110));
+    // Elle reste cliquable et nommée : c'est un bouton avec un `title`, pas une
+    // image muette.
+    ok("et elle reste le retour à l'accueil, annoncé",
+       /<button class="brand" id="brand" title="Retour à l'accueil">/
+           .test(readFileSync(`${ROOT}/index.html`, "utf8")));
+
+    /* --- deux réglages quittent la barre d'outils sur un téléphone ---
+
+       Le filtre de plateformes : on regarde la matrice, on ne l'affine pas, et
+       son défaut est celui qu'on veut. Le bouton d'agrandissement : la matrice
+       occupe déjà toute la largeur. Ce sont deux réglages masqués, pas deux
+       fonctions retirées — les contrôles restent montés, la valeur par défaut
+       s'applique, et rien de la matrice ne devient inaccessible. */
+    ok("le filtre de plateformes et l'agrandissement quittent la barre au doigt",
+       /#dd-platform,\s*\n\s*\[data-panel="matrix"\] \.panel-expand\s*\{\s*display:\s*none/.test(doigt),
+       doigt.replace(/\s+/g, " ").slice(-110));
+    ok("mais le filtre reste monté, avec toutes ses plateformes",
+       window.document.querySelectorAll("#platform-panel input[data-platform]").length > 0,
+       String(window.document.querySelectorAll("#platform-panel input[data-platform]").length));
 }
+
+console.log("\n[43] Le haut de page, allégé");
+{
+    const homeCss = readFileSync(`${ROOT}/css/home.css`, "utf8");
+    const baseCss = readFileSync(`${ROOT}/css/base.css`, "utf8");
+    const home = window.document.getElementById("view-home");
+
+    // « maturité cyber » est le seul endroit du titre où le sens tient à deux
+    // mots collés : réparti sur deux lignes, il cesse de se lire d'un bloc.
+    ok("« maturité cyber » ne se coupe jamais",
+       /\.hero h1 em\s*\{[^}]*white-space:\s*nowrap/.test(homeCss));
+
+    // La pastille flottait dans 1160 px avec un large vide entre la marque et
+    // les ancres.
+    const largeur = Number(/#topbar\[data-mode="home"\]\s*\{[\s\S]*?width:\s*min\((\d+)px/.exec(baseCss)?.[1] ?? 0);
+    ok("la barre haute est resserrée", largeur > 0 && largeur <= 1040, `${largeur}px`);
+
+    // « Ouvrir un layer » décrivait la mécanique de reprise, qui se constate
+    // en important un fichier et ne s'apprend pas avant.
+    const ouvrir = [...home.querySelectorAll(".action-card")]
+        .find(c => /Ouvrir un layer/.test(c.querySelector("h3")?.textContent ?? ""));
+    ok("l'entrée « Ouvrir un layer » tient en une phrase",
+       !/première question|tout est renseigné/.test(ouvrir?.textContent ?? ""),
+       ouvrir?.querySelector("p")?.textContent.trim());
+}
+
 
 console.log("\n[40] Aucun tiret cadratin dans ce que l'utilisateur lit");
 {

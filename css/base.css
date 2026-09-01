@@ -130,7 +130,7 @@ body {
        largeur imposée au-delà de 320 px hors media query, et il a raison — c'est
        ainsi qu'on fait déborder une page sur un téléphone. Ici la largeur est
        bornée par la fenêtre en premier. */
-    width: min(1160px, calc(100% - 28px));
+    width: min(1000px, calc(100% - 28px));
     height: 58px;
     padding: 0 8px 0 18px;
     gap: 10px;
@@ -669,6 +669,25 @@ code { font-size: 0.9em; background: var(--surface-3); padding: 1px 5px; border-
         font-weight: 600;
         text-decoration: none;
     }
+}
+
+/* --- la barre d'outil sur un écran étroit ---
+
+   Elle porte cinq choses à 430 px de large : la marque, l'onglet du layer avec
+   son avancement, sa croix de fermeture, « Questionnaire », « Exporter » et la
+   bascule de thème. Elles se chevauchaient, faute de place.
+
+   Ce qui cède est ce qui se déduit. Le mot « MAPTRIX » s'efface, la mascotte
+   reste — elle suffit à désigner le retour à l'accueil, et c'est le même geste.
+   Les boutons perdent leurs marges intérieures. L'onglet du layer, lui, garde sa
+   place : c'est le seul élément qui porte une information qu'on ne peut pas
+   retrouver ailleurs, le nom de l'évaluation et son avancement. */
+@media (max-width: 640px) {
+    #topbar[data-mode="app"] .brand { font-size: 0; gap: 0; }
+    #topbar[data-mode="app"] .brand-mascot { font-size: 1rem; }
+    #topbar[data-mode="app"] { gap: 8px; }
+    #topbar[data-mode="app"] .btn-sm { padding: 5px 8px; font-size: 0.68rem; }
+    #topbar-actions { gap: 5px; }
 }
 
 @media (max-width: 560px) {

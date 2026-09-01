@@ -288,11 +288,6 @@ function heroSection(data) {
                         <button class="btn btn-quiet btn-lg" id="home-explore">Explorer la matrice</button>
                     </div>
 
-                    <div class="home-figures">
-                        <div class="figure"><span class="v">${data.counts.mitigations}</span><span class="k">mitigations</span></div>
-                        <div class="figure"><span class="v">${data.counts.techniques}</span><span class="k">techniques</span></div>
-                        <div class="figure"><span class="v">${data.counts.subTechniques}</span><span class="k">sous-techniques</span></div>
-                    </div>
                 </div>
 
                 ${heroMatrix(data)}
@@ -325,10 +320,7 @@ function startSection() {
                     <div class="action-card spotlight" data-reveal>
                         <span class="glyph">${GLYPH_OPEN}</span>
                         <h3>Ouvrir un layer existant</h3>
-                        <p>
-                            Reprenez une évaluation en important son fichier. On repart à la première
-                            question sans réponse, ou droit à la matrice si tout est renseigné.
-                        </p>
+                        <p>Reprenez une évaluation en important son fichier.</p>
                         <div class="drop-zone" id="home-drop">
                             <b>Choisir un fichier</b> ou le déposer ici<br>
                             un fichier exporté par cet outil, JSON ou Excel

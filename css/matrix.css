@@ -284,6 +284,17 @@
        sans qu'on ait à le deviner. Une liste de quarante-quatre mitigations
        déroulée en entier ferait de la page un couloir. */
     [data-panel="mitigations"] .panel-body { max-height: 236px; overflow-y: auto; }
+
+    /* Deux réglages quittent la barre d'outils. Le filtre de plateformes : sur
+       un téléphone on regarde la matrice, on ne l'affine pas, et son défaut
+       — toutes les plateformes — est celui qu'on veut. Le bouton d'agrandissement :
+       la matrice occupe déjà toute la largeur, il n'a plus rien à agrandir.
+
+       Ce sont deux réglages, pas deux fonctions : rien ne devient inaccessible,
+       la matrice reste complète et le filtre garde sa valeur par défaut. La
+       place gagnée revient à la recherche et à la légende, qui, elles, servent. */
+    #dd-platform,
+    [data-panel="matrix"] .panel-expand { display: none; }
 }
 
 /* ------------------------------------------------------------- barre d'outils */
