@@ -1,15 +1,17 @@
 /* ============================================================================
-   Les deux visuels de la page d'accueil.
+   Les deux visuels dessinés à la main du projet.
 
-   Tous deux sont des **exemples**, pas des données : au premier chargement il n'y
-   a aucune évaluation à montrer, et l'accueil doit tout de même donner à voir ce
-   que l'outil produit. La légende qui le disait sous la rosace a été retirée —
-   elle expliquait l'évidence à un lecteur qui n'a encore rien saisi. Le statut
-   d'exemple reste porté par le `aria-label`, pour qui ne voit pas le dessin.
+   `heroMatrix` ouvre la page d'accueil : la matrice ATT&CK, vraie structure du
+   référentiel, arrêtée à Credential Access. Elle est vide — c'est l'état d'une
+   évaluation qui n'a pas commencé.
 
-   Rien d'externe, rien de calculé au fil du temps : du SVG statique et deux
-   animations CSS confiées au compositeur. Les deux respectent
-   `prefers-reduced-motion`, géré dans home.css.
+   `rosace` sert le tableau de bord de la matrice, sur les niveaux réellement
+   atteints. Elle a aussi une forme d'exemple, utilisée quand aucune évaluation
+   n'existe encore.
+
+   Rien d'externe, rien de calculé au fil du temps : du SVG et du HTML statiques.
+   Les animations de la rosace respectent `prefers-reduced-motion`, géré dans
+   home.css.
    ========================================================================= */
 
 import { esc } from "../ui.js";
@@ -278,135 +280,71 @@ export function rosaceAutonome(svg) {
     return `<?xml version="1.0" encoding="UTF-8"?>\n${new XMLSerializer().serializeToString(clone)}`;
 }
 
-/* ------------------------------------------------- la matrice en arrière-plan */
+/* ----------------------------------------------- la matrice du haut de page
 
-/* Une seule bande, et des cases plus grandes.
-   Trois bandes de vitesses différentes donnaient trois fois la même découpe à
-   trois hauteurs : la répétition sautait aux yeux et la matrice n'était plus
-   reconnaissable, juste un motif. Une bande unique, avec des cases assez larges
-   pour qu'on lise les en-têtes de tactique, redonne à l'accueil ce qu'il doit
-   montrer — la vraie silhouette d'ATT&CK. */
-const BACKDROP = {
-    cellW: 92, cellH: 16, gap: 4,
-    header: 26,        // hauteur de l'en-tête de tactique
-    maxRows: 28,       // les tactiques les plus fournies sont écrêtées
-    repeats: 2,        // blocs de matrice côte à côte dans une trame
-    /* Plancher de largeur à couvrir. La largeur réelle est celle de la fenêtre,
-       ce plancher lui laissant de la marge pour une rotation ou un
-       redimensionnement — le fond n'est pas recomposé à chaque resize. Le nombre
-       de copies s'en déduit plutôt que d'être fixé : la trame dépend du nombre de
-       tactiques du référentiel, et une valeur en dur redeviendrait fausse si
-       celui-ci changeait. Couvrir 4 K en toutes circonstances coûtait une copie
-       de plus à tout le monde, téléphones compris, pour trois bandes à composer
-       en continu. */
-    coverFloor: 1440,
+   La moitié droite de l'accueil montre la matrice elle-même, arrêtée net à la
+   colonne Credential Access.
+
+   Elle remplace le fond défilant qui occupait toute la page. Ce fond avait un
+   défaut de fond : pour ne pas gêner la lecture il fallait le diluer à 17 %
+   d'opacité et le creuser d'un masque — c'est-à-dire le rendre méconnaissable
+   pour qu'il devienne supportable. Une matrice montrée franchement, à côté du
+   titre plutôt que derrière, dit la même chose sans rien coûter à la lecture.
+
+   Elle est vide : ni couleurs, ni notes. C'est le premier écran d'une évaluation
+   qui n'a pas commencé, et c'est exactement ce que voit quelqu'un qui arrive.
+   Les niveaux viendront quand ils voudront dire quelque chose.
+
+   Sept colonnes seulement : au-delà, les cases deviennent trop étroites pour que
+   le nom d'une technique s'y lise, et une matrice illisible ne prouve rien. La
+   coupe est franche et assumée — le dégradé qui la termine dit qu'il y a une
+   suite, sans faire croire qu'on la voit. */
+const HERO = {
+    premiere: "initial-access",
+    derniere: "credential-access",
+    /* Assez de cases pour qu'on voie une colonne, pas assez pour qu'on la lise
+       en entier : le bas est estompé de toute façon. */
+    lignes: 15,
 };
 
-/** Durée de défilement. Lente : le fond doit vivre, pas attirer l'œil. */
-const DUREE = 190;
-
 /**
- * Générateur déterministe. Deux rendus successifs doivent donner exactement la
- * même trame : sans quoi le fond changerait à chaque retour sur l'accueil.
- */
-function seeded(seed) {
-    let s = seed;
-    return () => {
-        s = (s * 1103515245 + 12345) & 0x7fffffff;
-        return s / 0x7fffffff;
-    };
-}
-
-/**
- * La matrice ATT&CK qui défile sans fin derrière l'accueil.
+ * La tranche de matrice affichée en haut de l'accueil.
  *
- * C'est la vraie structure qui est reprise : une colonne par tactique, dans
- * l'ordre du référentiel, et autant de cases que la tactique compte de
- * techniques. C'est cette silhouette en dents de scie qui rend la matrice
- * reconnaissable au premier coup d'œil — une trame inventée n'y ressemblerait
- * pas. Seules les couleurs sont un exemple.
+ * Structure réelle du référentiel : les tactiques dans leur ordre, et sous
+ * chacune ses vraies techniques. Rien n'est inventé — c'est ce qui la rend
+ * reconnaissable au premier coup d'œil par qui connaît ATT&CK.
  *
- * Le bloc de 15 colonnes est répété pour composer une trame assez large, avec
- * des couleurs différentes à chaque répétition pour ne pas donner à voir un
- * carrelage. La trame est ensuite reprise par `<use>` : translater d'exactement
- * sa largeur ramène au point de départ, la boucle est donc sans couture, et le
- * document ne porte les rectangles qu'une seule fois.
+ * Hors de l'arbre d'accessibilité : une lecture vocale y débiterait cent noms de
+ * techniques sans qu'aucun n'apprenne quoi que ce soit. Ce que la matrice dit,
+ * le titre et l'accroche le disent déjà en trois lignes.
+ *
+ * @param {object} data référentiel ATT&CK normalisé
  */
-export function matrixBackdrop(data) {
-    const { cellW, cellH, gap, header, maxRows, repeats } = BACKDROP;
-    const pitchX = cellW + gap;
-    const pitchY = cellH + gap;
-
+export function heroMatrix(data) {
     const tactics = data?.tactics ?? [];
     if (!tactics.length) return "";
 
-    const blockWidth = tactics.length * pitchX;
-    const width = repeats * blockWidth;
-    const rows = Math.min(maxRows, Math.max(...tactics.map(t =>
-        (data.byTactic?.get(t.shortname)?.length ?? 0))) || maxRows);
-    const bandHeight = header + rows * pitchY + 18;
-    const random = seeded(20260804);
+    const debut = tactics.findIndex(t => t.shortname === HERO.premiere);
+    const fin = tactics.findIndex(t => t.shortname === HERO.derniere);
+    // Un référentiel qui renommerait ces deux tactiques ne doit pas faire
+    // disparaître le visuel : on retombe alors sur les premières colonnes.
+    const tranche = debut !== -1 && fin !== -1 && fin >= debut
+        ? tactics.slice(debut, fin + 1)
+        : tactics.slice(0, 7);
 
-    const parts = [];
-    for (let rep = 0; rep < repeats; rep++) {
-        tactics.forEach((tactic, col) => {
-            const x = rep * blockWidth + col * pitchX;
-            const count = Math.min(maxRows, data.byTactic?.get(tactic.shortname)?.length ?? 0);
+    const colonnes = tranche.map(tactic => {
+        const techniques = (data.byTactic?.get(tactic.shortname) ?? []).slice(0, HERO.lignes);
+        const cases = techniques
+            .map(tech => `<span class="hm-cell">${esc(tech.name)}</span>`)
+            .join("");
+        return `<div class="hm-col">
+                    <span class="hm-head">${esc(tactic.name)}</span>
+                    ${cases}
+                </div>`;
+    }).join("");
 
-            parts.push(`<rect class="bd-head" x="${x}" y="0" width="${cellW}" height="${header}" rx="2"/>`);
-            parts.push(`<text class="bd-head-text" x="${x + 4}" y="${header - 7}">${esc(tactic.name)}</text>`);
-
-            for (let row = 0; row < count; row++) {
-                // Une case sur cinq reste vide : les techniques non couvertes.
-                const level = random() < 0.2 ? "none" : Math.min(4, Math.floor(random() * 5));
-                parts.push(`<rect class="bd-cell l${level}" x="${x}" y="${header + row * pitchY}"
-                                  width="${cellW}" height="${cellH}" rx="2"/>`);
-            }
-        });
-    }
-
-    // Les copies de la trame, alignées bout à bout à partir de l'origine.
-    //
-    // La bande part de −1 trame et remonte à 0 : le défilement se fait donc vers
-    // la droite, et la matière qui entre par la gauche est celle des copies
-    // suivantes. Tout reste en coordonnées positives, ce qui compte — un `<svg>`
-    // écrête à son viewport, et une copie placée avant l'origine ne serait tout
-    // simplement pas dessinée.
-    //
-    // Couverture à l'instant t ∈ [−trame, 0] :
-    //     [t, copies × trame + t]
-    // Le bord gauche reste ≤ 0, et le bord droit vaut au pire
-    // (copies − 1) × trame : c'est cette valeur qui doit dépasser l'écran, d'où
-    // le nombre de copies.
-    const cover = Math.max(BACKDROP.coverFloor, globalThis.innerWidth || 0);
-    const copyCount = Math.max(2, Math.ceil(cover / width) + 1);
-    const totalWidth = copyCount * width;
-
-    // La bande est un élément **HTML**, pas un groupe SVG.
-    //
-    // Ce n'est pas un détail de forme : WebKit n'anime pas de façon fiable une
-    // transformation CSS posée sur un élément interne d'un SVG. Le fond restait
-    // parfaitement immobile sur iOS quand il défilait sur Chrome. Translater un
-    // `div` est en revanche le cas le mieux accéléré qui existe, partout.
-    const copies = Array.from({ length: copyCount }, (_, i) =>
-        `<use href="#bd-tiles" x="${i * width}" y="0"/>`).join("");
-    const strip = `<div class="bd-band" style="--dur:${DUREE}s">
-        <svg width="${totalWidth}" height="${bandHeight}"
-             viewBox="0 0 ${totalWidth} ${bandHeight}">${copies}</svg>
-    </div>`;
-
-    // `--trame` est l'amplitude du défilement : le CSS anime de cette largeur
-    // exactement, sans avoir à connaître la géométrie décrite ici.
-    //
-    // La trame ne vit qu'une fois, dans un SVG de définitions que les bandes
-    // reprennent par `<use>` — c'est la technique du sprite, et elle marche entre
-    // deux `<svg>` du même document. Ce conteneur n'est pas en `display:none` :
-    // certains navigateurs cessent alors de résoudre les références.
     return `
-        <div class="home-backdrop" aria-hidden="true" data-couvre="${cover}" style="--trame:${width}px">
-            <svg class="bd-defs" width="0" height="0" aria-hidden="true" focusable="false">
-                <defs><g id="bd-tiles">${parts.join("")}</g></defs>
-            </svg>
-            ${strip}
+        <div class="hero-matrix" aria-hidden="true">
+            <div class="hm-grid">${colonnes}</div>
         </div>`;
 }

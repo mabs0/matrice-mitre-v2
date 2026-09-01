@@ -3,8 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>MAPTRIX — Diagnostic de maturité cyber sur MITRE ATT&amp;CK</title>
-    <meta name="description" content="Outil de diagnostic de la maturité cyber d'une organisation, fondé sur les mesures d'atténuation du framework MITRE ATT&amp;CK Enterprise.">
+    <title>MAPTRIX — Maturité cyber sur MITRE ATT&amp;CK</title>
+    <meta name="description" content="Un diagnostic structuré autour de MITRE ATT&amp;CK pour évaluer vos pratiques de sécurité, identifier vos angles morts et prioriser vos actions.">
+
+    <!--
+        L'icône d'onglet, c'est la mascotte : le même poulpe que le logo de la
+        barre haute et que l'écran de chargement. Un fichier SVG plutôt qu'un
+        .ico — il tient en un tracé, reste net à toutes les tailles, et la
+        politique de sécurité l'autorise puisqu'il vient du site lui-même.
+
+        `mask-icon` est le repli de Safari, qui ne lit l'icône SVG que sous cette
+        forme, et lui applique la couleur annoncée.
+    -->
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="mask-icon" href="favicon.svg" color="#2a78d6">
 
     <!--
         Politique de sécurité du contenu.
@@ -254,17 +266,40 @@
     })();
     </script>
 
-    <header id="topbar">
+    <!--
+        Une seule barre haute, deux métiers.
+
+        Sur l'accueil (`data-mode="home"`) c'est la barre d'un site : une pastille
+        flottante et translucide qui survole la page, avec les ancres des sections
+        et l'appel à l'action. Dans l'application (`data-mode="app"`) c'est la
+        barre d'un outil : l'onglet du layer, son avancement, et les actions qui
+        portent dessus.
+
+        Deux en-têtes distincts auraient été plus simples à écrire et faux à
+        l'usage : la marque, la bascule de thème et le retour à l'accueil sont les
+        mêmes des deux côtés, et les dédoubler, c'est se condamner à les faire
+        diverger. C'est `main.js` qui pose le mode, au moment où il change de vue.
+    -->
+    <header id="topbar" data-mode="home">
         <button class="brand" id="brand" title="Retour à l'accueil">
             <svg class="brand-mascot" viewBox="0 0 64 64" aria-hidden="true"><use href="#mascot"/></svg>
             MAPTRIX
         </button>
 
-        <div id="layer-tabs"></div>
+        <!--
+            Les liens de section. Ils ne mènent nulle part ailleurs : l'accueil
+            est une page unique, et chacun y fait descendre. Ce sont de vrais
+            `href` — le clic droit, le milieu et le clavier fonctionnent — dont
+            `main.js` ne détourne que le défilement, pour l'adoucir.
+        -->
+        <nav id="site-nav" aria-label="Sections de la page">
+            <a class="nav-link" href="#demarrer">Démarrer</a>
+            <a class="nav-link" href="#comment">Comment ça marche</a>
+            <a class="nav-link" href="#benefices">Bénéfices</a>
+            <a class="nav-link" href="#faq">FAQ</a>
+        </nav>
 
-        <span class="version-badge hidden" id="version-badge">
-            <i class="dot"></i><span id="version-text"></span>
-        </span>
+        <div id="layer-tabs"></div>
 
         <!--
             Questionnaire et Exporter vivent ici plutôt que dans la barre d'outils
@@ -275,8 +310,11 @@
         -->
         <div id="topbar-actions" class="hidden"></div>
 
-        <button class="btn btn-ghost btn-icon" id="theme-toggle" title="Basculer clair / sombre"
-                aria-label="Basculer entre le thème clair et le thème sombre">☀</button>
+        <div class="topbar-end">
+            <button class="btn btn-ghost btn-icon" id="theme-toggle" title="Basculer clair / sombre"
+                    aria-label="Basculer entre le thème clair et le thème sombre">☀</button>
+            <button class="btn btn-cta" id="nav-cta">Démarrer</button>
+        </div>
     </header>
 
     <main id="views" style="flex:1 1 auto;min-height:0;display:flex;flex-direction:column;">

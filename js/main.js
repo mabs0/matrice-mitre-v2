@@ -6,7 +6,7 @@ import { loadAttack } from "./attack.js";
 import { initTheme, toggleTheme, current as currentTheme } from "./theme.js";
 import { esc, $, toast, initModal, initDropdowns } from "./ui.js";
 import { progress } from "./layer.js";
-import { renderHome } from "./views/home.js";
+import { renderHome, promptNewLayer } from "./views/home.js";
 import { renderMatrix, repaintMatrix, resetMatrixView } from "./views/matrix.js";
 import { renderQuiz, resetQuiz } from "./views/quiz.js";
 
@@ -35,10 +35,14 @@ const app = {
             $(`#view-${view}`).classList.toggle("hidden", view !== name);
         }
 
-        // Le badge de version n'appartient qu'à l'accueil. Ailleurs il n'apporte
-        // rien et dispute la barre haute à l'onglet du layer, qui porte, lui,
-        // l'avancement — l'information qu'on regarde vraiment.
-        $("#version-badge")?.classList.toggle("hidden", name !== "home" || !this.data);
+        // La barre haute change de métier avec la vue : pastille flottante et
+        // ancres de section sur l'accueil, barre d'outil ailleurs. C'est le seul
+        // endroit qui en décide — le CSS fait le reste depuis `data-mode`.
+        const topbar = $("#topbar");
+        if (topbar) {
+            topbar.dataset.mode = name === "home" ? "home" : "app";
+            if (name !== "home") topbar.classList.remove("scrolled");
+        }
 
         // Questionnaire et Exporter sont montés par la vue matrice, qui seule
         // sait les câbler. Ailleurs, ils désigneraient l'écran qu'on regarde.
@@ -103,6 +107,65 @@ function leaveLayer(app) {
     return true;
 }
 
+/* --------------------------------------------------------- ancres de section
+
+   L'accueil est une page unique : les liens de la barre haute n'y mènent nulle
+   part ailleurs, ils y font descendre. Trois choses à câbler, une seule fois
+   pour toute la session — la barre, elle, ne se recompose jamais.
+
+   Le défilement est détourné pour deux raisons. La page ne défile pas dans la
+   fenêtre mais dans `#view-home`, et un `href` seul y laisse le navigateur
+   choisir quel conteneur bouger — il choisit juste, mais pas partout. Et
+   l'adresse ne gagne pas un `#faq` qui, au rechargement suivant, ferait sauter
+   la page avant même que son contenu existe.
+
+   Le même écouteur de défilement sert deux fins : densifier le verre de la barre
+   dès qu'on a quitté le haut de page, et marquer l'ancre de la section qu'on
+   regarde. Deux écouteurs pour deux marques auraient fait le même travail deux
+   fois. */
+
+/** Ligne de visée : une section est « celle qu'on regarde » dès qu'elle passe
+    sous la barre haute, avec sa marge d'ancrage. */
+const VISEE = 96;
+
+function initSiteNav() {
+    const nav = $("#site-nav");
+    const home = $("#view-home");
+    const topbar = $("#topbar");
+    if (!nav || !home || !topbar) return;
+
+    const liens = [...nav.querySelectorAll(".nav-link")];
+
+    for (const lien of liens) {
+        lien.addEventListener("click", e => {
+            const cible = home.querySelector(lien.getAttribute("href"));
+            if (!cible) return;             // section absente : le lien reprend son sens normal
+            e.preventDefault();
+            cible.scrollIntoView({ block: "start" });
+        });
+    }
+
+    // La pastille d'action lance l'évaluation, là où l'ancre « Démarrer » ne fait
+    // que descendre à la section. Les faire aboutir au même endroit aurait rendu
+    // l'une des deux inutile.
+    const cta = $("#nav-cta");
+    if (cta) cta.onclick = () => promptNewLayer(app);
+
+    const marquerSection = () => {
+        let courante = null;
+        for (const lien of liens) {
+            const cible = home.querySelector(lien.getAttribute("href"));
+            if (cible && cible.getBoundingClientRect().top <= VISEE) courante = lien;
+        }
+        for (const lien of liens) lien.classList.toggle("current", lien === courante);
+    };
+
+    home.addEventListener("scroll", () => {
+        topbar.classList.toggle("scrolled", home.scrollTop > 12);
+        marquerSection();
+    }, { passive: true });
+}
+
 /* ----------------------------------------------------------------- démarrage */
 
 async function boot() {
@@ -117,6 +180,8 @@ async function boot() {
     }
     const brand = $("#brand");
     if (brand) brand.onclick = () => leaveLayer(app);
+
+    initSiteNav();
 
     // Vu par le diagnostic de démarrage d'index.html : les modules se chargent.
     window.__ctrmBooted = true;
@@ -175,19 +240,6 @@ async function boot() {
         $("#boot-retry")?.addEventListener("click", () => location.reload());
         console.error(err);
         return;
-    }
-
-    const versionText = $("#version-text");
-    const versionBadge = $("#version-badge");
-    // Sur un écran étroit, seul le numéro reste : « ATT&CK Enterprise » ne
-    // porte rien de plus que le contexte, qui est déjà connu.
-    if (versionText) {
-        versionText.innerHTML =
-            `<span class="vb-long">ATT&amp;CK Enterprise </span><b>v${esc(app.data.version)}</b>`;
-    }
-    if (versionBadge) {
-        versionBadge.title =
-            `Publiée le ${new Date(app.data.modified).toLocaleDateString("fr-FR")} · relue à chaque chargement`;
     }
 
     // Prévient une fermeture accidentelle : rien n'est stocké côté navigateur.

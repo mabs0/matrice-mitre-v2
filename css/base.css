@@ -17,7 +17,20 @@ body {
 
 .hidden { display: none !important; }
 
-/* ---------------------------------------------------------------- barre haute */
+/* ---------------------------------------------------------------- barre haute
+
+   Une barre, deux métiers, portés par `data-mode` (posé par main.js).
+
+   `app` — la barre d'un outil : dense, 48 px, collée en haut du flux, elle porte
+   l'onglet du layer et les actions qui s'y appliquent. C'est la barre historique,
+   inchangée.
+
+   `home` — la barre d'un site : une pastille flottante et translucide, détachée
+   du flux, qui survole la page pendant qu'elle défile. Elle porte les ancres des
+   sections et l'appel à l'action, rien d'autre.
+
+   Passer de l'une à l'autre change la position, pas l'élément : marque, bascule
+   de thème et retour à l'accueil restent le même bouton des deux côtés. */
 
 #topbar {
     display: flex;
@@ -29,6 +42,63 @@ body {
     background: var(--surface);
     border-bottom: 1px solid var(--border);
     z-index: 60;
+}
+
+/* Ce qui n'appartient qu'à un mode disparaît dans l'autre. Masqué, pas retiré :
+   les deux jeux d'éléments sont montés une fois pour toutes par le document, et
+   changer de vue ne recompose pas la barre. */
+#topbar[data-mode="app"] #site-nav,
+#topbar[data-mode="app"] #nav-cta,
+#topbar[data-mode="home"] #layer-tabs,
+#topbar[data-mode="home"] #topbar-actions { display: none; }
+
+/* --- le verre de l'accueil ---
+
+   Une couche translucide qui floute et sature ce qui passe dessous : le fond
+   n'est pas caché, il est diffusé. La saturation compense le lavage que produit
+   le flou — sans elle, le verre grise tout ce qu'il recouvre.
+
+   Le liseré clair sur l'arête haute (`inset 0 1px 0`) est ce qui fait lire une
+   épaisseur plutôt qu'un aplat transparent : c'est la lumière rasante sur la
+   tranche. Le reste est une ombre portée, très étalée, qui décolle la pastille
+   de la page.
+
+   Sans `backdrop-filter` — Firefox l'a longtemps désactivé par défaut — la règle
+   de repli plus bas repasse sur un fond opaque : translucide sans flou, le texte
+   de la page traverse la barre et rien n'est lisible. */
+#topbar[data-mode="home"] {
+    position: fixed;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    /* Écrit en `min()` et non en `width` + `max-width` : le banc refuse toute
+       largeur imposée au-delà de 320 px hors media query, et il a raison — c'est
+       ainsi qu'on fait déborder une page sur un téléphone. Ici la largeur est
+       bornée par la fenêtre en premier. */
+    width: min(1160px, calc(100% - 28px));
+    height: 58px;
+    padding: 0 8px 0 18px;
+    gap: 10px;
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-pill);
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(18px) saturate(180%);
+    backdrop-filter: blur(18px) saturate(180%);
+    box-shadow: inset 0 1px 0 var(--glass-hi), var(--glass-shadow);
+    transition: background 0.25s ease, height 0.25s ease, box-shadow 0.25s ease;
+}
+
+/* Dès que la page a défilé, le verre se densifie et la pastille se resserre :
+   la barre passe devant du contenu au lieu du seul haut de page, et doit gagner
+   en opacité pour rester lisible. La classe est posée par main.js. */
+#topbar[data-mode="home"].scrolled {
+    height: 52px;
+    background: var(--glass-strong);
+    box-shadow: inset 0 1px 0 var(--glass-hi), var(--shadow-lg);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    #topbar[data-mode="home"] { background: var(--surface); }
 }
 
 .brand {
@@ -51,6 +121,50 @@ body {
 }
 .brand-mascot { width: 22px; height: 22px; flex: none; }
 
+#topbar[data-mode="home"] .brand { font-size: 1rem; letter-spacing: -0.02em; }
+#topbar[data-mode="home"] .brand-mascot { width: 26px; height: 26px; }
+
+/* --- les ancres de section ---
+
+   Elles occupent le centre de la pastille, et le survol y pose un voile arrondi
+   plutôt qu'un soulignement : c'est la même matière que la barre, en plus dense.
+   Le voile grandit depuis 92 % — un mouvement court, qui donne de la matière au
+   survol sans faire sauter la mise en page. */
+#site-nav {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex: 1 1 auto;
+    justify-content: center;
+    min-width: 0;
+}
+
+.nav-link {
+    position: relative;
+    padding: 8px 13px;
+    border-radius: var(--radius-pill);
+    font-size: 0.81rem;
+    font-weight: 500;
+    color: var(--text-dim);
+    text-decoration: none;
+    white-space: nowrap;
+    transition: color 0.18s ease;
+}
+.nav-link::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: var(--overlay);
+    opacity: 0;
+    transform: scale(0.92);
+    transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.nav-link:hover, .nav-link.current { color: var(--text); }
+.nav-link:hover::before, .nav-link.current::before { opacity: 1; transform: none; }
+.nav-link > span { position: relative; }
+
+.topbar-end { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
 
 /* Onglets de layer, dans l'esprit Tidal Cyber */
 #layer-tabs { display: flex; align-items: center; gap: 6px; flex: 1 1 auto; min-width: 0; }
@@ -103,20 +217,6 @@ body {
 /* Actions sur le layer, montées par la vue matrice. */
 #topbar-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
 
-.version-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 0.68rem;
-    color: var(--text-dim);
-    padding: 4px 9px;
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    white-space: nowrap;
-}
-.version-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--good); }
-.version-badge b { color: var(--text); font-variant-numeric: tabular-nums; }
-
 /* ------------------------------------------------------------------- boutons */
 
 button { font-family: inherit; }
@@ -150,6 +250,49 @@ button { font-family: inherit; }
 .btn-icon { padding: 7px 9px; font-size: 0.9rem; line-height: 1; }
 .btn-sm { padding: 5px 10px; font-size: 0.72rem; }
 
+/* --- variantes de la page publique ---
+
+   L'outil garde ses boutons d'outil : compacts, à coins peu marqués, faits pour
+   être alignés par dizaines dans une barre. La page d'accueil, elle, en montre
+   trois ou quatre en tout, chacun portant une décision : ils sont plus grands,
+   entièrement arrondis, et le principal est un aplat sombre plutôt qu'un aplat
+   d'accent — c'est le contraste le plus fort dont la page dispose, on le réserve
+   à l'action qu'on attend. */
+.btn-lg {
+    padding: 12px 22px;
+    font-size: 0.86rem;
+    font-weight: 600;
+    border-radius: var(--radius-pill);
+}
+
+.btn-cta {
+    padding: 9px 17px;
+    border-radius: var(--radius-pill);
+    background: var(--ink);
+    border-color: transparent;
+    color: var(--ink-text);
+    font-weight: 600;
+}
+.btn-cta:hover {
+    background: var(--ink-2);
+    border-color: transparent;
+    color: var(--ink-text);
+    box-shadow: var(--shadow-sm);
+}
+
+/* Le second choix d'une paire : présent, mais qui ne dispute pas la première
+   place. Un contour seul, sur le fond de la page. */
+.btn-quiet {
+    background: transparent;
+    border-color: var(--border-strong);
+    color: var(--text);
+}
+.btn-quiet:hover {
+    background: var(--overlay);
+    border-color: var(--text-mute);
+    color: var(--text);
+}
+
 /* --------------------------------------------------------- champs de saisie */
 
 input[type="text"], input[type="password"], input[type="email"], input[type="search"],
@@ -174,7 +317,10 @@ label { font-size: 0.74rem; color: var(--text-dim); }
 /* --------------------------------------------------------------------- vues */
 
 .view { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
-.view.scrollable { overflow-y: auto; }
+/* Le défilement adouci sert les ancres de l'accueil : un saut sec d'une section
+   à l'autre fait perdre le fil de l'endroit d'où l'on vient. Il est neutralisé
+   plus bas, avec les autres animations, en mouvement réduit. */
+.view.scrollable { overflow-y: auto; scroll-behavior: smooth; }
 
 /* ---------------------------------------------------------------- chargement */
 
@@ -219,6 +365,7 @@ label { font-size: 0.74rem; color: var(--text-dim); }
 
 @media (prefers-reduced-motion: reduce) {
     .boot-mascot, .boot-mascot .m-arms { animation: none; }
+    .view.scrollable { scroll-behavior: auto; }
 }
 #boot .sub { font-size: 0.8rem; color: var(--text-dim); max-width: 420px; line-height: 1.5; }
 #boot .bar { width: min(340px, 82vw); height: 5px; background: var(--surface-3); border-radius: 20px; overflow: hidden; }
@@ -347,9 +494,19 @@ code { font-size: 0.9em; background: var(--surface-3); padding: 1px 5px; border-
    sensible : à 48 px de haut, tout ce qui déborde casse la mise en page. Le
    badge de version s'y réduit à son numéro — il n'apparaît que sur l'accueil,
    où il ne dispute la place à personne, mais la place est comptée. */
+/* Les quatre ancres ne tiennent pas dans la pastille sous ~900 px. Elles
+   s'effacent, la marque et l'appel à l'action restent : la page se parcourt
+   alors au défilement, ce qu'on fait de toute façon sur un écran de cette
+   largeur. Le menu déplié propre à ces écrans viendra avec la passe responsive,
+   qui doit traiter le téléphone pour lui-même et non comme un bureau rétréci. */
+@media (max-width: 900px) {
+    #topbar[data-mode="home"] #site-nav { display: none; }
+    #topbar[data-mode="home"] { justify-content: space-between; }
+}
+
 @media (max-width: 560px) {
     #topbar { gap: 9px; padding: 0 10px; }
-    .version-badge .vb-long { display: none; }
+    #topbar[data-mode="home"] { padding: 0 8px 0 14px; height: 52px; }
     .layer-tab { max-width: none; }
 
     .modal { padding: 3vh 10px; }

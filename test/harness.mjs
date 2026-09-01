@@ -14,7 +14,9 @@ import { dirname, resolve } from "node:path";
 // Le banc tourne depuis test/ ; la racine du projet est le dossier parent.
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 let failures = 0;
+let checks = 0;
 const ok = (label, cond, extra = "") => {
+    checks++;
     if (cond) console.log(`  ✓ ${label}${extra ? " — " + extra : ""}`);
     else { failures++; console.log(`  ✗ ${label}${extra ? " — " + extra : ""}`); }
 };
@@ -1358,290 +1360,342 @@ console.log("\n[24b] Une question commune n'est jamais reposée");
        window.document.querySelector(".quiz-result")?.textContent.replace(/\s+/g, " ").match(/\d+ questions? répondue[^·]*·[^·]*/)?.[0]);
 }
 
-/* ------------------------------------------- visuels de l'accueil et actions */
+/* --------------------------------------- accueil : sections, matrice, rosace */
 
-console.log("\n[25] Rosace et matrice de fond sur l'accueil");
+console.log("\n[25] Accueil : la page publique");
 window.document.getElementById("brand").click();
 {
     const home = window.document.getElementById("view-home");
     // Les mêmes données normalisées que celles servies à l'application.
     const data = await (await import(`${APP}/js/attack.js`)).loadAttack();
     const homeCss = readFileSync(`${ROOT}/css/home.css`, "utf8");
+    const html = readFileSync(`${ROOT}/index.html`, "utf8");
 
-    // La rosace porte les tactiques, pas les mitigations : c'est l'axe de
-    // lecture d'ATT&CK, et quinze rayons se lisent là où quarante-trois
-    // faisaient une dentelle. Les noms viennent du référentiel relu, donc une
-    // tactique ajoutée par MITRE apparaît sans qu'on touche à rien.
-    const tactiques = data.tactics.map(t => t.name);
-    ok("un rayon par tactique du référentiel",
-       home.querySelectorAll(".ros-spoke").length === tactiques.length,
-       `${home.querySelectorAll(".ros-spoke").length} rayons pour ${tactiques.length} tactiques`);
-    ok("quatre polygones de repère, un par palier",
-       home.querySelectorAll(".ros-web").length === 4);
+    /* --- la matrice du haut de page ---
 
-    const dots = home.querySelectorAll(".ros-dot");
-    ok("un sommet par tactique", dots.length === tactiques.length, String(dots.length));
-    ok("chaque sommet porte un niveau de 0 à 4",
-       [...dots].every(d => /(^| )l[0-4]( |$)/.test(d.getAttribute("class"))));
-    // Le libellé est porté par le groupe qui réunit la pastille et sa zone de
-    // saisie : posé sur la seule pastille, il ne s'affichait pas au survol de la
-    // zone, qui la recouvre.
-    ok("chaque sommet nomme sa tactique au survol",
-       [...dots].map(d => (d.closest(".ros-vertex")?.querySelector("title")?.textContent ?? "")
-           .replace(/ — (niveau [0-4],\d|non évaluée)$/, ""))
-           .join("|") === tactiques.join("|"),
-       dots[0]?.closest(".ros-vertex")?.querySelector("title")?.textContent);
-    ok("les sommets apparaissent l'un après l'autre",
-       [...dots].map(d => d.style.getPropertyValue("--i")).join(",")
-           === [...dots].map((_, i) => String(i)).join(","));
+       Elle a remplacé le fond défilant. Ce fond avait un défaut de fond : pour ne
+       pas gêner la lecture il fallait le diluer à 17 % et le creuser d'un masque,
+       c'est-à-dire le rendre méconnaissable pour le rendre supportable. --- */
 
-    // Le tracé doit relier exactement les sommets, dans le même ordre.
-    const shapePoints = home.querySelector(".ros-shape")?.getAttribute("points").trim().split(/\s+/);
-    ok("le tracé relie tous les sommets", shapePoints?.length === tactiques.length,
-       String(shapePoints?.length));
-    ok("et passe exactement par eux",
-       shapePoints?.every((p, i) => p === `${dots[i].getAttribute("cx")},${dots[i].getAttribute("cy")}`));
+    ok("plus de matrice défilante en arrière-plan",
+       !home.querySelector(".home-backdrop") && !/\.home-backdrop/.test(homeCss));
 
-    // Le contour se déroule sur son périmètre : une valeur approchée montrerait
-    // le tracé déjà commencé, ou couperait la fin de l'animation.
-    const shapeEl = home.querySelector(".ros-shape");
-    const closed = shapePoints.map(p => p.split(",").map(Number));
-    const perimeter = closed.reduce((total, [x, y], i) => {
-        const [px, py] = closed[(i + closed.length - 1) % closed.length];
-        return total + Math.hypot(x - px, y - py);
-    }, 0);
-    ok("le déroulé du contour vaut son périmètre exact",
-       Math.abs(Number(shapeEl.style.getPropertyValue("--tour")) - perimeter) < 1,
-       `${shapeEl.style.getPropertyValue("--tour")} pour ${perimeter.toFixed(1)}`);
+    const matrice = home.querySelector(".hero-matrix");
+    ok("la matrice ouvre la page, à côté du titre", !!matrice);
+    ok("elle est hors de l'arbre d'accessibilité",
+       matrice?.getAttribute("aria-hidden") === "true");
 
-    // La valeur centrale doit être la moyenne réelle des niveaux affichés.
-    const levels = [...dots].map(d => Number(/l([0-4])/.exec(d.getAttribute("class"))[1]));
-    const mean = (levels.reduce((a, b) => a + b, 0) / levels.length).toFixed(1).replace(".", ",");
-    ok("la valeur centrale est la moyenne des sommets",
-       home.querySelector(".ros-value")?.textContent === mean,
-       `${home.querySelector(".ros-value")?.textContent} attendu ${mean}`);
-    // La légende « Exemple — un rayon par tactique… » a été retirée : elle
-    // expliquait le dessin à un lecteur qui n'a encore rien saisi, et pesait
-    // sous une rosace désormais centrée. Le statut d'exemple reste porté par le
-    // `aria-label`, pour qui ne voit pas le dessin.
-    ok("plus de légende sous la rosace",
-       !home.querySelector(".rosace-figure figcaption"));
-    ok("mais le statut d'exemple reste annoncé à qui ne la voit pas",
-       /exemple/i.test(home.querySelector(".rosace")?.getAttribute("aria-label") ?? ""),
-       home.querySelector(".rosace")?.getAttribute("aria-label"));
+    const colonnes = [...home.querySelectorAll(".hm-col .hm-head")].map(h => h.textContent.trim());
+    // Le cadrage s'arrête à Credential Access : au-delà, les colonnes deviennent
+    // trop étroites pour qu'un nom de technique s'y lise.
+    const attendues = data.tactics
+        .slice(data.tactics.findIndex(t => t.shortname === "initial-access"),
+               data.tactics.findIndex(t => t.shortname === "credential-access") + 1)
+        .map(t => t.name);
+    ok("elle va d'Initial Access à Credential Access, et s'arrête là",
+       colonnes.join(" | ") === attendues.join(" | "), colonnes.join(" | "));
 
-    /* --- les axes sont nommés --- */
+    // Les techniques sont les vraies : c'est ce qui la rend reconnaissable.
+    const noms = new Set(data.techniques.map(t => t.name));
+    const cases = [...home.querySelectorAll(".hm-cell")];
+    ok("les cases portent de vraies techniques du référentiel",
+       cases.length > 0 && cases.every(c => noms.has(c.textContent.trim())),
+       cases.slice(0, 3).map(c => c.textContent.trim()).join(" · "));
 
-    // Sans libellé, la rosace ne se lit qu'au survol : un geste qui n'existe pas
-    // au doigt, donc pas de lecture du tout sur un téléphone.
-    const axes = home.querySelectorAll(".ros-axis");
-    const lignesDe = a => [...a.querySelectorAll("tspan")].map(t => t.textContent);
-    ok("chaque rayon porte le nom de sa tactique",
-       [...axes].map(a => lignesDe(a).join(" ")).join("|") === tactiques.join("|"),
-       `${axes.length} libellés pour ${tactiques.length} rayons`);
-    ok("les noms sont posés à l'horizontale, jamais couchés",
-       [...axes].every(a => !a.getAttribute("transform")),
-       axes[0]?.getAttribute("transform") ?? "aucune rotation");
-    // Un nom coupé au milieu d'un mot ne se lit plus : la coupure se fait aux
-    // espaces, et seulement là.
-    ok("les noms longs sont repliés aux espaces",
-       [...axes].every(a => lignesDe(a).every(l => !/^\S*-$/.test(l))) &&
-       [...axes].some(a => lignesDe(a).length > 1),
-       [...axes].map(a => lignesDe(a).join("/")).filter(t => t.includes("/")).slice(0, 3).join(" · "));
-    // Chaque libellé doit s'éloigner du dessin, pas le recouvrir : à droite il
-    // part du rayon, à gauche il s'y termine, en haut et en bas il se centre.
-    const ancres = [...axes].map(a => ["start", "end", "mid"].find(c => a.classList.contains(c)));
-    ok("chaque nom est ancré du côté où il s'éloigne du centre",
-       ancres.every(Boolean) && [...axes].every((a, i) => {
-           const dx = Number(a.getAttribute("x")) - 160;
-           const dy = Number(a.getAttribute("y")) - 160;
-           if (ancres[i] === "start") return dx > 0;
-           if (ancres[i] === "end") return dx < 0;
-           return Math.abs(dx) <= Math.hypot(dx, dy) * 0.3;   // proche de la verticale
-       }),
-       [...new Set(ancres)].join(","));
-    ok("et le CSS traduit les trois ancrages",
-       /\.ros-axis\.start\s*\{\s*text-anchor:\s*start/.test(homeCss) &&
-       /\.ros-axis\.end\s*\{\s*text-anchor:\s*end/.test(homeCss) &&
-       /\.ros-axis\.mid\s*\{\s*text-anchor:\s*middle/.test(homeCss));
+    // Vide, parce qu'aucune évaluation n'a commencé. Les couleurs viendront
+    // quand elles voudront dire quelque chose.
+    ok("aucune case n'est colorée : c'est une matrice vierge",
+       cases.every(c => !/\bl[0-4]\b|lvl-/.test(c.className)),
+       [...new Set(cases.map(c => c.className))].join(" | "));
 
-    // Un libellé qui sort du viewBox est rogné, ou mord sur le texte voisin.
-    // C'est ce que la couronne du viewBox doit absorber : on le mesure plutôt
-    // que de le supposer, la largeur d'un « Resource Development » n'étant pas
-    // négociable — et le référentiel peut allonger ses noms sans prévenir.
-    const font = Number(/\.ros-axis\s*\{[^}]*font-size:\s*([\d.]+)px/.exec(homeCss)[1]);
+    /* --- une page, des sections, et les ancres qui y mènent --- */
 
-    /** Les libellés qui sortent du cadre, mesurés à 0,6 em par caractère. */
-    const debordent = (liste, svg) => {
-        const [minX, minY, boxW, boxH] = svg.getAttribute("viewBox").split(/\s+/).map(Number);
-        return liste.filter(a => {
-            const ancre = ["start", "end", "mid"].find(c => a.classList.contains(c));
-            const x = Number(a.getAttribute("x"));
-            const y = Number(a.getAttribute("y"));
-            const lignes = lignesDe(a);
-            const largeur = Math.max(...lignes.map(l => l.length)) * font * 0.6;
-            const gauche = ancre === "start" ? x : ancre === "end" ? x - largeur : x - largeur / 2;
-            const hauteur = lignes.length * font * 0.8;
-            return gauche < minX || gauche + largeur > minX + boxW
-                || y - hauteur < minY || y + hauteur > minY + boxH;
-        });
-    };
+    const ancres = [...window.document.querySelectorAll("#site-nav .nav-link")]
+        .map(a => a.getAttribute("href"));
+    ok("la barre haute porte les ancres des sections",
+       ancres.join(",") === "#demarrer,#comment,#benefices,#faq", ancres.join(","));
+    ok("chaque ancre trouve sa section dans la page",
+       ancres.every(href => !!home.querySelector(href)),
+       ancres.filter(href => !home.querySelector(href)).join(",") || "toutes présentes");
+    ok("aucune ne quitte la page",
+       ancres.every(href => href.startsWith("#")));
+    ok("les sections se décalent sous la barre flottante",
+       /\.band\[id\]\s*\{[^}]*scroll-margin-top/.test(homeCss));
 
-    const spill = debordent([...axes], home.querySelector(".rosace"));
-    ok("les libellés tiennent dans le cadre de la rosace", spill.length === 0,
-       `${spill.length} débordent — ${spill.map(a => lignesDe(a).join(" ")).join(", ")}`);
+    // La barre haute est la même des deux côtés, seul son mode change.
+    ok("elle est en mode « accueil » sur l'accueil",
+       window.document.getElementById("topbar").dataset.mode === "home");
+    ok("le mode pilote ce qui s'affiche, sans dédoubler la barre",
+       /#topbar\[data-mode="app"\] #site-nav/.test(readFileSync(`${ROOT}/css/base.css`, "utf8")));
 
-    // Le référentiel du banc n'a que deux tactiques : de quoi vérifier la
-    // mécanique, pas de quoi savoir si « Resource Development » tient dans la
-    // couronne. On rejoue donc le rendu sur les quinze noms réels — le cas que
-    // l'utilisateur a sous les yeux, et le seul où la place manque vraiment.
+    /* --- l'icône d'onglet --- */
+
+    ok("le document déclare une icône",
+       /<link rel="icon" href="favicon\.svg" type="image\/svg\+xml">/.test(html));
+    const icone = readFileSync(`${ROOT}/favicon.svg`, "utf8");
+    ok("c'est bien la mascotte, pas une image quelconque",
+       /<svg/.test(icone) && /circle/.test(icone) && icone.split("<path").length - 1 >= 6,
+       `${icone.split("<path").length - 1} tracés`);
+
+    /* --- le haut de page : un titre court, une accroche courte --- */
+
+    const h1 = home.querySelector(".hero h1");
+    ok("le titre tient en une phrase, sans nommer le référentiel",
+       h1?.textContent.replace(/\s+/g, " ").trim()
+           === "Évaluez la maturité cyber de votre organisation",
+       h1?.textContent.replace(/\s+/g, " ").trim());
+    ok("« maturité cyber » est mis en avant dans le titre",
+       h1?.querySelector("em")?.textContent === "maturité cyber");
+    const lead = home.querySelector(".hero-lead")?.textContent.replace(/\s+/g, " ").trim() ?? "";
+    ok("l'accroche dit le référentiel, en une phrase",
+       /MITRE ATT&CK/.test(lead) && lead.length < 220, `${lead.length} caractères`);
+    ok("la version du référentiel est annoncée en haut de page",
+       window.document.getElementById("version-text")?.textContent.includes(data.version),
+       window.document.getElementById("version-text")?.textContent);
+
+    /* --- le parcours en trois temps --- */
+
+    const steps = home.querySelectorAll(".home-steps .step");
+    ok("trois étapes expliquent le parcours", steps.length === 3, String(steps.length));
+    ok("évaluer, visualiser, exploiter",
+       [...steps].map(s => s.querySelector("h3").textContent).join(" → ")
+           === "Évaluez vos pratiques → Visualisez votre couverture → Exploitez vos résultats",
+       [...steps].map(s => s.querySelector("h3").textContent).join(" → "));
+    ok("elles sont numérotées sur deux chiffres",
+       [...steps].map(s => s.querySelector(".step-num").textContent).join(",") === "01,02,03",
+       [...steps].map(s => s.querySelector(".step-num").textContent).join(","));
+    ok("un filet relie chaque étape à la suivante, sauf la dernière",
+       /\.step:not\(:last-child\)::after/.test(homeCss));
+
+    /* --- les bénéfices --- */
+
+    const benefices = home.querySelectorAll(".benefit-card");
+    ok("quatre bénéfices annoncés", benefices.length === 4, String(benefices.length));
+    ok("chacun porte une vignette et un texte",
+       [...benefices].every(c => c.querySelector(".benefit-visual svg") && c.querySelector("p")));
+    // Une jauge qui afficherait « 87 % » sur une page publique se lirait comme
+    // une mesure, alors que c'est un dessin.
+    ok("aucune vignette n'affiche de chiffre",
+       ![...benefices].some(c => /\d/.test(c.querySelector(".benefit-visual").textContent)));
+    ok("les vignettes sont hors de l'arbre d'accessibilité",
+       [...benefices].every(c => c.querySelector(".benefit-visual svg").getAttribute("aria-hidden") === "true"));
+
+    /* --- la FAQ --- */
+
+    const faq = home.querySelectorAll(".faq-item");
+    ok("la FAQ répond à plusieurs questions", faq.length >= 5, String(faq.length));
+    ok("elle est repliable par le navigateur, pas à la main",
+       [...faq].every(d => d.tagName.toLowerCase() === "details" && !!d.querySelector("summary")));
+    ok("aucune réponse n'est ouverte au chargement",
+       [...faq].every(d => !d.hasAttribute("open")));
+    // Une FAQ qui promet plus que l'outil ne fait est le plus court chemin vers
+    // la défiance : la première réponse est celle qu'on vérifie.
+    ok("la première question est celle du stockage, et la réponse est « rien »",
+       /partent-elles/.test(faq[0]?.querySelector("summary")?.textContent ?? "") &&
+       /ni serveur/.test(faq[0]?.querySelector(".faq-answer")?.textContent ?? ""),
+       faq[0]?.querySelector("summary")?.textContent);
+
+    /* --- le pied de page --- */
+
+    const pied = home.querySelector(".site-footer");
+    ok("la page se ferme sur un pied de page", !!pied);
+    ok("il rappelle l'action, une seule fois",
+       pied?.querySelectorAll(".footer-cta .btn").length === 1);
+    ok("ses colonnes remontent vers les sections de la page",
+       [...pied.querySelectorAll('.footer-col a[href^="#"]')]
+           .every(a => !!home.querySelector(a.getAttribute("href"))),
+       [...pied.querySelectorAll('.footer-col a[href^="#"]')].map(a => a.getAttribute("href")).join(","));
+    // Un lien sortant s'ouvre ailleurs, et ne laisse pas la page ouvrante
+    // accessible à la page ouverte.
+    ok("les liens sortants sont protégés",
+       [...pied.querySelectorAll('a[target="_blank"]')]
+           .every(a => /noopener/.test(a.getAttribute("rel") ?? "")),
+       String(pied.querySelectorAll('a[target="_blank"]').length));
+    ok("la source des données est citée, sans mention de marque ni lien",
+       pied.querySelector(".home-foot")?.textContent.trim() === "Données tirées de MITRE ATT&CK" &&
+       !pied.querySelector(".home-foot a"),
+       pied.querySelector(".home-foot")?.textContent.trim());
+
+    /* --- le rythme des fonds ---
+
+       Un blanc cassé unique sur toute la hauteur donne une page plate, où rien
+       n'annonce qu'on change de sujet. Chaque bande porte son fond, et aucun
+       composant ne pose le sien. --- */
+
+    const fonds = [...homeCss.matchAll(/\.band-(\w+)\s*\{[^}]*background:\s*([^;]+);/g)]
+        .map(m => [m[1], m[2].replace(/\s+/g, " ").trim()]);
+    ok("chaque section porte son propre fond",
+       fonds.length >= 4 && new Set(fonds.map(f => f[1])).size >= 3,
+       fonds.map(f => f.join(" = ")).join(" | "));
+
+    /* --- la rosace ---
+
+       Elle n'est plus sur l'accueil : c'est le visuel du tableau de bord de la
+       matrice, sur les niveaux réellement atteints. Sa mécanique se vérifie donc
+       sur un rendu détaché, et non plus dans la page. --- */
     {
         const { rosace } = await import(`${APP}/js/views/home-visuals.js`);
-        const reelles = ["Reconnaissance", "Resource Development", "Initial Access",
-            "Execution", "Persistence", "Privilege Escalation", "Stealth",
-            "Defense Impairment", "Credential Access", "Discovery", "Lateral Movement",
-            "Collection", "Command and Control", "Exfiltration", "Impact"];
-        const bac = window.document.createElement("div");
-        bac.innerHTML = rosace({ tactics: reelles.map(name => ({ name })) });
+        const ros = window.document.createElement("div");
+        ros.innerHTML = rosace(data);
 
-        const vrais = [...bac.querySelectorAll(".ros-axis")];
-        ok("les quinze tactiques d'Enterprise tiennent dans le cadre",
-           vrais.length === reelles.length &&
-           debordent(vrais, bac.querySelector(".rosace")).length === 0,
-           debordent(vrais, bac.querySelector(".rosace")).map(a => lignesDe(a).join(" ")).join(", ")
-               || `${vrais.length} libellés placés`);
-        // Deux libellés voisins qui se chevauchent sont illisibles à deux. Sur la
-        // moitié droite comme sur la gauche, l'écart vertical entre rayons
-        // voisins doit dépasser la hauteur d'un libellé de deux lignes.
-        const ys = vrais.map(a => Number(a.getAttribute("y")));
-        const cotes = [1, -1].map(signe => vrais
-            .map((a, i) => ({ dx: Number(a.getAttribute("x")) - 160, y: ys[i] }))
-            .filter(p => Math.sign(p.dx) === signe)
-            .map(p => p.y).sort((a, b) => a - b));
-        const serres = cotes.flatMap(col => col.slice(1)
-            .map((y, i) => y - col[i]).filter(ecart => ecart < font * 2.2));
-        ok("deux noms voisins ne se chevauchent pas", serres.length === 0,
-           serres.length ? `écarts trop courts : ${serres.map(e => e.toFixed(1)).join(", ")}px`
-               : `écart minimal ${Math.min(...cotes.flatMap(col => col.slice(1)
-                   .map((y, i) => y - col[i]))).toFixed(1)}px pour ${(font * 2.2).toFixed(1)}px requis`);
-    }
+        // La rosace porte les tactiques, pas les mitigations : c'est l'axe de
+        // lecture d'ATT&CK, et quinze rayons se lisent là où quarante-trois
+        // faisaient une dentelle. Les noms viennent du référentiel relu, donc une
+        // tactique ajoutée par MITRE apparaît sans qu'on touche à rien.
+        const tactiques = data.tactics.map(t => t.name);
+        ok("un rayon par tactique du référentiel",
+           ros.querySelectorAll(".ros-spoke").length === tactiques.length,
+           `${ros.querySelectorAll(".ros-spoke").length} rayons pour ${tactiques.length} tactiques`);
+        ok("quatre polygones de repère, un par palier",
+           ros.querySelectorAll(".ros-web").length === 4);
 
-    // La matrice de fond reprend la vraie structure du référentiel : une colonne
-    // par tactique, autant de cases que de techniques. C'est cette silhouette
-    // qui la rend reconnaissable.
-    const backdrop = home.querySelector(".home-backdrop");
-    ok("la matrice de fond est présente", !!backdrop);
-    ok("une colonne par tactique, répétée pour composer la trame",
-       home.querySelectorAll(".bd-head").length % data.tactics.length === 0 &&
-       home.querySelectorAll(".bd-head").length >= data.tactics.length,
-       `${home.querySelectorAll(".bd-head").length} en-têtes pour ${data.tactics.length} tactiques`);
-    ok("les en-têtes portent le nom réel des tactiques",
-       [...home.querySelectorAll(".bd-head-text")]
-           .every(t => data.tactics.some(tac => tac.name === t.textContent)),
-       [...home.querySelectorAll(".bd-head-text")].map(t => t.textContent).join(" | "));
-    ok("le nombre de cases suit le nombre réel de techniques",
-       home.querySelectorAll(".bd-cell").length ===
-           2 * data.tactics.reduce((n, t) => n + Math.min(28, data.byTactic.get(t.shortname).length), 0),
-       String(home.querySelectorAll(".bd-cell").length));
-    ok("elle est hors de l'arbre d'accessibilité", backdrop.getAttribute("aria-hidden") === "true");
-    ok("la trame de cases n'existe qu'une fois",
-       home.querySelectorAll("#bd-tiles").length === 1 &&
-       home.querySelectorAll("defs #bd-tiles").length === 1);
-    ok("elle est reprise par des <use>", home.querySelectorAll(".bd-band use").length >= 2);
+        const dots = ros.querySelectorAll(".ros-dot");
+        ok("un sommet par tactique", dots.length === tactiques.length, String(dots.length));
+        ok("chaque sommet porte un niveau de 0 à 4",
+           [...dots].every(d => /(^| )l[0-4]( |$)/.test(d.getAttribute("class"))));
+        // Le libellé est porté par le groupe qui réunit la pastille et sa zone de
+        // saisie : posé sur la seule pastille, il ne s'affichait pas au survol de la
+        // zone, qui la recouvre.
+        ok("chaque sommet nomme sa tactique au survol",
+           [...dots].map(d => (d.closest(".ros-vertex")?.querySelector("title")?.textContent ?? "")
+               .replace(/ — (niveau [0-4],\d|non évaluée)$/, ""))
+               .join("|") === tactiques.join("|"),
+           dots[0]?.closest(".ros-vertex")?.querySelector("title")?.textContent);
+        ok("les sommets apparaissent l'un après l'autre",
+           [...dots].map(d => d.style.getPropertyValue("--i")).join(",")
+               === [...dots].map((_, i) => String(i)).join(","));
 
-    // Le défilement porte sur un élément HTML. Une transformation CSS animée à
-    // l'intérieur d'un SVG n'est pas fiable dans WebKit — donc sur tout
-    // navigateur iOS, Firefox compris : le fond y restait immobile.
-    ok("les bandes sont des éléments HTML, pas des groupes SVG",
-       [...home.querySelectorAll(".bd-band")].every(b => b.tagName.toLowerCase() === "div"),
-       [...home.querySelectorAll(".bd-band")].map(b => b.tagName).join(","));
-    ok("la trame est définie hors des bandes, dans un SVG qui n'est pas masqué",
-       !!home.querySelector(".bd-defs defs #bd-tiles") &&
-       !/display:\s*none/.test(home.querySelector(".bd-defs").getAttribute("style") ?? ""));
-    // Une seule bande, et non plus trois à des vitesses différentes : les trois
-    // montraient la même découpe à trois hauteurs, et la répétition sautait aux
-    // yeux — la matrice se lisait comme un motif au lieu d'être reconnue.
-    ok("une seule bande défile", home.querySelectorAll(".bd-band").length === 1,
-       `${home.querySelectorAll(".bd-band").length} bande(s)`);
-    ok("et elle est assez grande pour qu'on lise les tactiques",
-       Number(/font-size:\s*([\d.]+)px/.exec(
-           /\.bd-head-text\s*\{[^}]*\}/.exec(homeCss)[0])[1]) >= 9);
+        // Le tracé doit relier exactement les sommets, dans le même ordre.
+        const shapePoints = ros.querySelector(".ros-shape")?.getAttribute("points").trim().split(/\s+/);
+        ok("le tracé relie tous les sommets", shapePoints?.length === tactiques.length,
+           String(shapePoints?.length));
+        ok("et passe exactement par eux",
+           shapePoints?.every((p, i) => p === `${dots[i].getAttribute("cx")},${dots[i].getAttribute("cy")}`));
 
-    // L'amplitude du défilement doit valoir exactement une trame, sinon la
-    // boucle saute. Le markup la porte, le CSS s'y réfère : pas de doublon.
-    const trame = Number(/(\d+)px/.exec(backdrop.style.getPropertyValue("--trame"))[1]);
-    const copyXs = [...home.querySelectorAll(".bd-band")[0].querySelectorAll("use")]
-        .map(u => Number(u.getAttribute("x")));
-    ok("les copies sont espacées d'exactement une trame",
-       copyXs.every((x, i) => x === i * trame), copyXs.join(", "));
+        // Le contour se déroule sur son périmètre : une valeur approchée montrerait
+        // le tracé déjà commencé, ou couperait la fin de l'animation.
+        const shapeEl = ros.querySelector(".ros-shape");
+        const closed = shapePoints.map(p => p.split(",").map(Number));
+        const perimeter = closed.reduce((total, [x, y], i) => {
+            const [px, py] = closed[(i + closed.length - 1) % closed.length];
+            return total + Math.hypot(x - px, y - py);
+        }, 0);
+        ok("le déroulé du contour vaut son périmètre exact",
+           Math.abs(Number(shapeEl.style.getPropertyValue("--tour")) - perimeter) < 1,
+           `${shapeEl.style.getPropertyValue("--tour")} pour ${perimeter.toFixed(1)}`);
 
-    // Le défaut classique : la bande se vide d'un côté en avançant, et le fond
-    // apparaît. On vérifie la couverture sur toute la plage de l'animation, en
-    // tenant compte de l'écrêtage par le viewport SVG — rien hors de celui-ci
-    // n'est dessiné.
-    // La largeur garantie est annoncée par le markup : elle suit la fenêtre, avec
-    // un plancher qui laisse de la marge pour une rotation. Couvrir le 4 K en
-    // toutes circonstances coûtait une copie de plus à tout le monde.
-    const cover = Number(backdrop.dataset.couvre);
-    ok("la largeur couverte suit la fenêtre, avec de la marge",
-       cover >= window.innerWidth && cover >= 1440,
-       `${cover}px annoncés pour une fenêtre de ${window.innerWidth}px`);
+        // La valeur centrale doit être la moyenne réelle des niveaux affichés.
+        const levels = [...dots].map(d => Number(/l([0-4])/.exec(d.getAttribute("class"))[1]));
+        const mean = (levels.reduce((a, b) => a + b, 0) / levels.length).toFixed(1).replace(".", ",");
+        ok("la valeur centrale est la moyenne des sommets",
+           ros.querySelector(".ros-value")?.textContent === mean,
+           `${ros.querySelector(".ros-value")?.textContent} attendu ${mean}`);
+        // La légende « Exemple — un rayon par tactique… » a été retirée : elle
+        // expliquait le dessin à un lecteur qui n'a encore rien saisi, et pesait
+        // sous une rosace désormais centrée. Le statut d'exemple reste porté par le
+        // `aria-label`, pour qui ne voit pas le dessin.
+        ok("plus de légende sous la rosace",
+           !ros.querySelector(".rosace-figure figcaption"));
+        ok("mais le statut d'exemple reste annoncé à qui ne la voit pas",
+           /exemple/i.test(ros.querySelector(".rosace")?.getAttribute("aria-label") ?? ""),
+           ros.querySelector(".rosace")?.getAttribute("aria-label"));
 
-    const svgWidth = Number(home.querySelector(".bd-band > svg").getAttribute("width"));
-    const holes = [];
-    for (const band of home.querySelectorAll(".bd-band")) {
-        const xs = [...band.querySelectorAll("use")].map(u => Number(u.getAttribute("x")));
-        const left = Math.max(0, Math.min(...xs));
-        const right = Math.min(svgWidth, Math.max(...xs) + trame);
-        for (const screen of [320, 768, cover]) {
-            // L'animation translate de −1 trame à 0.
-            for (const t of [-trame, -trame / 2, -1, 0]) {
-                if (left + t > 0 || right + t < screen) holes.push(`${screen}px à t=${t}`);
-            }
+        /* --- les axes sont nommés --- */
+
+        // Sans libellé, la rosace ne se lit qu'au survol : un geste qui n'existe pas
+        // au doigt, donc pas de lecture du tout sur un téléphone.
+        const axes = ros.querySelectorAll(".ros-axis");
+        const lignesDe = a => [...a.querySelectorAll("tspan")].map(t => t.textContent);
+        ok("chaque rayon porte le nom de sa tactique",
+           [...axes].map(a => lignesDe(a).join(" ")).join("|") === tactiques.join("|"),
+           `${axes.length} libellés pour ${tactiques.length} rayons`);
+        ok("les noms sont posés à l'horizontale, jamais couchés",
+           [...axes].every(a => !a.getAttribute("transform")),
+           axes[0]?.getAttribute("transform") ?? "aucune rotation");
+        // Un nom coupé au milieu d'un mot ne se lit plus : la coupure se fait aux
+        // espaces, et seulement là.
+        ok("les noms longs sont repliés aux espaces",
+           [...axes].every(a => lignesDe(a).every(l => !/^\S*-$/.test(l))) &&
+           [...axes].some(a => lignesDe(a).length > 1),
+           [...axes].map(a => lignesDe(a).join("/")).filter(t => t.includes("/")).slice(0, 3).join(" · "));
+        // Chaque libellé doit s'éloigner du dessin, pas le recouvrir : à droite il
+        // part du rayon, à gauche il s'y termine, en haut et en bas il se centre.
+        const ancres = [...axes].map(a => ["start", "end", "mid"].find(c => a.classList.contains(c)));
+        ok("chaque nom est ancré du côté où il s'éloigne du centre",
+           ancres.every(Boolean) && [...axes].every((a, i) => {
+               const dx = Number(a.getAttribute("x")) - 160;
+               const dy = Number(a.getAttribute("y")) - 160;
+               if (ancres[i] === "start") return dx > 0;
+               if (ancres[i] === "end") return dx < 0;
+               return Math.abs(dx) <= Math.hypot(dx, dy) * 0.3;   // proche de la verticale
+           }),
+           [...new Set(ancres)].join(","));
+        ok("et le CSS traduit les trois ancrages",
+           /\.ros-axis\.start\s*\{\s*text-anchor:\s*start/.test(homeCss) &&
+           /\.ros-axis\.end\s*\{\s*text-anchor:\s*end/.test(homeCss) &&
+           /\.ros-axis\.mid\s*\{\s*text-anchor:\s*middle/.test(homeCss));
+
+        // Un libellé qui sort du viewBox est rogné, ou mord sur le texte voisin.
+        // C'est ce que la couronne du viewBox doit absorber : on le mesure plutôt
+        // que de le supposer, la largeur d'un « Resource Development » n'étant pas
+        // négociable — et le référentiel peut allonger ses noms sans prévenir.
+        const font = Number(/\.ros-axis\s*\{[^}]*font-size:\s*([\d.]+)px/.exec(homeCss)[1]);
+
+        /** Les libellés qui sortent du cadre, mesurés à 0,6 em par caractère. */
+        const debordent = (liste, svg) => {
+            const [minX, minY, boxW, boxH] = svg.getAttribute("viewBox").split(/\s+/).map(Number);
+            return liste.filter(a => {
+                const ancre = ["start", "end", "mid"].find(c => a.classList.contains(c));
+                const x = Number(a.getAttribute("x"));
+                const y = Number(a.getAttribute("y"));
+                const lignes = lignesDe(a);
+                const largeur = Math.max(...lignes.map(l => l.length)) * font * 0.6;
+                const gauche = ancre === "start" ? x : ancre === "end" ? x - largeur : x - largeur / 2;
+                const hauteur = lignes.length * font * 0.8;
+                return gauche < minX || gauche + largeur > minX + boxW
+                    || y - hauteur < minY || y + hauteur > minY + boxH;
+            });
+        };
+
+        const spill = debordent([...axes], ros.querySelector(".rosace"));
+        ok("les libellés tiennent dans le cadre de la rosace", spill.length === 0,
+           `${spill.length} débordent — ${spill.map(a => lignesDe(a).join(" ")).join(", ")}`);
+
+        // Le référentiel du banc n'a que deux tactiques : de quoi vérifier la
+        // mécanique, pas de quoi savoir si « Resource Development » tient dans la
+        // couronne. On rejoue donc le rendu sur les quinze noms réels — le cas que
+        // l'utilisateur a sous les yeux, et le seul où la place manque vraiment.
+        {
+            const { rosace } = await import(`${APP}/js/views/home-visuals.js`);
+            const reelles = ["Reconnaissance", "Resource Development", "Initial Access",
+                "Execution", "Persistence", "Privilege Escalation", "Stealth",
+                "Defense Impairment", "Credential Access", "Discovery", "Lateral Movement",
+                "Collection", "Command and Control", "Exfiltration", "Impact"];
+            const bac = window.document.createElement("div");
+            bac.innerHTML = rosace({ tactics: reelles.map(name => ({ name })) });
+
+            const vrais = [...bac.querySelectorAll(".ros-axis")];
+            ok("les quinze tactiques d'Enterprise tiennent dans le cadre",
+               vrais.length === reelles.length &&
+               debordent(vrais, bac.querySelector(".rosace")).length === 0,
+               debordent(vrais, bac.querySelector(".rosace")).map(a => lignesDe(a).join(" ")).join(", ")
+                   || `${vrais.length} libellés placés`);
+            // Deux libellés voisins qui se chevauchent sont illisibles à deux. Sur la
+            // moitié droite comme sur la gauche, l'écart vertical entre rayons
+            // voisins doit dépasser la hauteur d'un libellé de deux lignes.
+            const ys = vrais.map(a => Number(a.getAttribute("y")));
+            const cotes = [1, -1].map(signe => vrais
+                .map((a, i) => ({ dx: Number(a.getAttribute("x")) - 160, y: ys[i] }))
+                .filter(p => Math.sign(p.dx) === signe)
+                .map(p => p.y).sort((a, b) => a - b));
+            const serres = cotes.flatMap(col => col.slice(1)
+                .map((y, i) => y - col[i]).filter(ecart => ecart < font * 2.2));
+            ok("deux noms voisins ne se chevauchent pas", serres.length === 0,
+               serres.length ? `écarts trop courts : ${serres.map(e => e.toFixed(1)).join(", ")}px`
+                   : `écart minimal ${Math.min(...cotes.flatMap(col => col.slice(1)
+                       .map((y, i) => y - col[i]))).toFixed(1)}px pour ${(font * 2.2).toFixed(1)}px requis`);
         }
     }
-    ok("aucun trou dans le défilement, du téléphone à la largeur annoncée",
-       holes.length === 0, holes.slice(0, 3).join(" | "));
-
-    // Les copies s'alignent bout à bout à partir de l'origine : c'est ce qui
-    // rend la boucle sans couture, l'animation translatant d'exactement une
-    // trame. Un décalage géométrique rognerait la couverture d'un côté.
-    ok("les copies s'alignent bout à bout depuis l'origine",
-       [...home.querySelectorAll(".bd-band")].every(b =>
-           [...b.querySelectorAll("use")].every((u, i) => Number(u.getAttribute("x")) === i * trame)));
-
-    ok("le CSS anime d'une variable, sans redire la géométrie",
-       /translateX\(calc\(-1 \* var\(--trame\)\)\)/.test(homeCss) &&
-       !/translateX\(-?\d+px\)/.test(homeCss));
-    ok("la matrice de fond est écrêtée, pas de débordement de page",
-       /\.home-backdrop\s*\{[^}]*overflow:\s*hidden/.test(homeCss));
-    // On isole le bloc « mouvement réduit » et on regarde ce qu'il contient.
-    const reduced = /@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{([\s\S]*?)\n\}/.exec(homeCss)?.[1] ?? "";
-    ok("toutes les animations se coupent en mouvement réduit",
-       ["\\.bd-band", "\\.ros-web-group", "\\.ros-shape", "\\.ros-dot"]
-           .every(sel => new RegExp(`${sel}[^}]*animation:\\s*none`).test(reduced)),
-       reduced.replace(/\s+/g, " ").trim());
-    ok("l'accueil est positionné pour contenir le fond",
-       /#view-home\s*\{[^}]*position:\s*relative/.test(homeCss));
-
-    /* --- les trois temps du parcours --- */
-    const steps = home.querySelectorAll(".home-steps .step");
-    ok("trois cases expliquent le parcours", steps.length === 3, String(steps.length));
-    ok("dans l'ordre questionnaire, matrice, export",
-       [...steps].map(s => s.querySelector("h3").textContent).join(" → ")
-           === "Questionnaire → Matrice → Export",
-       [...steps].map(s => s.querySelector("h3").textContent).join(" → "));
-    ok("elles sont numérotées",
-       [...steps].map(s => s.querySelector(".step-num").textContent).join("") === "123");
-
-    /* --- ce qui a été retiré --- */
-    ok("plus d'encart sur l'absence d'enregistrement", !home.querySelector(".home-note"));
-    ok("le pied de page se limite à la source",
-       home.querySelector(".home-foot")?.textContent.trim() === "Données tirées de MITRE ATT&CK",
-       home.querySelector(".home-foot")?.textContent.trim());
-    ok("il ne porte plus de lien ni de mention de marque",
-       !home.querySelector(".home-foot a") &&
-       !/marque déposée|attack-stix-data/.test(home.querySelector(".home-foot")?.textContent ?? ""));
 }
 
 console.log("\n[25b] Nouveau layer réduit au nom");
@@ -1923,8 +1977,16 @@ console.log("\n[30] Tenue sur écran étroit");
 
     const base = sheets.find(([n]) => n === "base")[1];
     const narrow = /@media\s*\(max-width:\s*560px\)\s*\{([\s\S]*)\n\}/.exec(base)?.[1] ?? "";
-    ok("la barre haute est allégée : version réduite à son numéro",
-       /\.version-badge \.vb-long\s*\{\s*display:\s*none/.test(narrow),
+    // Le numéro de version a quitté la barre pour le haut de page, où il est
+    // adossé à la promesse au lieu de flotter sans contexte. Ce qui doit céder
+    // sur un écran étroit, ce sont les quatre ancres : elles ne tiennent pas
+    // dans la pastille, et la page se parcourt de toute façon au défilement.
+    const sousNeufCents = /@media\s*\(max-width:\s*900px\)\s*\{([\s\S]*?)\n\}/.exec(base)?.[1] ?? "";
+    ok("la barre haute est allégée : les ancres s'effacent",
+       /#topbar\[data-mode="home"\] #site-nav\s*\{\s*display:\s*none/.test(sousNeufCents),
+       sousNeufCents.replace(/\s+/g, " ").slice(0, 120));
+    ok("et la pastille se resserre sur un téléphone",
+       /#topbar\[data-mode="home"\]\s*\{[^}]*height:\s*52px/.test(narrow),
        narrow.replace(/\s+/g, " ").slice(0, 120));
     // La marque ne porte plus de sous-titre : « MAPTRIX maturité cyber »
     // répétait dans la barre ce que la page dit déjà en grand juste dessous.
@@ -1958,20 +2020,18 @@ console.log("\n[30] Tenue sur écran étroit");
     /* --- ce qu'on ne montre pas, ou autrement, sur un petit écran --- */
 
     const homeCss = sheets.find(([n]) => n === "home")[1];
-    // Le fond doit rester visible sur un téléphone : c'est là qu'il donne le plus
-    // à voir de ce que fait l'outil. Il n'est ni masqué, ni affaibli — seule
-    // l'échancrure du masque se resserre sur le bloc de texte.
-    ok("le fond qui défile reste affiché sur un téléphone",
-       !/\.home-backdrop\s*\{\s*display:\s*none/.test(homeCss));
-    // L'intensité reste réglable d'un seul endroit : la variable, portée par le
-    // conteneur. Un `opacity` posé ailleurs rendrait le réglage introuvable.
-    const fonds = [...homeCss.matchAll(/([.#\w-]+)\s*\{[^}]*?--fond:\s*([\d.]+)/g)]
-        .map(m => `${m[1]}=${m[2]}`);
-    ok("l'intensité se règle depuis .home-backdrop et nulle part ailleurs",
-       fonds.length > 0 && fonds.every(f => f.startsWith(".home-backdrop")),
-       fonds.join(" "));
-    ok("son masque se resserre quand le contenu prend toute la largeur",
-       /@media\s*\(max-width:\s*700px\)\s*\{[^}]*\.home-backdrop\s*\{[^}]*mask-image/.test(homeCss));
+    // La matrice du haut de page n'est jamais masquée : c'est elle qui montre ce
+    // que fait l'outil, et c'est sur un petit écran qu'on a le moins de patience
+    // pour lire à sa place. Elle passe sous la promesse au lieu d'être à côté.
+    ok("la matrice du haut de page reste affichée sur un téléphone",
+       !/\.hero-matrix\s*\{\s*display:\s*none/.test(homeCss));
+    ok("le haut de page passe sur une colonne quand la place manque",
+       /@media\s*\(max-width:\s*1000px\)\s*\{[\s\S]*?\.hero\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/.test(homeCss));
+    // Les deux colonnes de texte du parcours et de la FAQ ne tiennent pas non
+    // plus : leur intro cesse d'être collée en haut, sinon elle occupe l'écran.
+    ok("le parcours et la FAQ repassent sur une colonne",
+       /@media\s*\(max-width:\s*1000px\)\s*\{[\s\S]*?\.steps-grid, \.faq-grid\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/.test(homeCss) &&
+       /\.steps-intro, \.faq-intro\s*\{[^}]*position:\s*static/.test(homeCss));
     // Les chiffres ont perdu leur grille cloisonnée : trois nombres posés, sans
     // cadre. Sur écran étroit ils gardent une seule ligne — trois colonnes
     // explicites, donc jamais de trou en fin de ligne à reboucher.
@@ -1981,23 +2041,33 @@ console.log("\n[30] Tenue sur écran étroit");
        !/\.home-stats/.test(homeCss) &&
        !/\.home-figures\s*\{[^}]*background:\s*var\(--border\)/.test(homeCss));
 
-    // Empilées, les étapes passent leur numéro à gauche du texte et le filet du
-    // parcours bascule à la verticale : il relie encore chaque étape à la
-    // suivante, au lieu de disparaître comme le faisait la flèche.
-    ok("empilées, les étapes mettent leur numéro à gauche du texte",
-       /@media\s*\(max-width:\s*700px\)\s*\{[\s\S]*?\.step\s*\{[^}]*padding:\s*0 0 0 40px/.test(homeCss));
-    ok("et le filet du parcours passe à la verticale",
-       /@media\s*\(max-width:\s*700px\)\s*\{[\s\S]*?\.step:not\(:last-child\)::after\s*\{[^}]*width:\s*1px/.test(homeCss));
+    // Les étapes sont empilées à toutes les largeurs, numéro à gauche du texte,
+    // reliées par un filet vertical. Ce qui cède quand la place manque, c'est le
+    // décalage de la deuxième : en escalier sur un écran étroit, elle sortirait.
+    ok("les étapes portent leur numéro à gauche du texte",
+       /\.step\s*\{[^}]*padding-left:\s*\d+px/.test(homeCss));
+    ok("le filet du parcours est vertical",
+       /\.step:not\(:last-child\)::after\s*\{[^}]*width:\s*1px/.test(homeCss));
+    ok("et l'escalier s'aplatit quand la place manque",
+       /@media\s*\(max-width:\s*1000px\)\s*\{[\s\S]*?\.step:nth-child\(2\)\s*\{[^}]*margin-left:\s*0/.test(homeCss));
 
-    // Le badge de version ne vit que sur l'accueil : ailleurs il n'apprend rien
-    // et dispute la barre haute à l'onglet du layer, qui porte l'avancement.
-    const versionBadge = window.document.getElementById("version-badge");
+    // Le numéro de version vit dans le haut de page, pas dans la barre : il
+    // disparaît donc avec l'accueil, sans que personne ait à le masquer. La
+    // barre, elle, change de métier — pastille d'ancres ici, barre d'outil là.
     window.document.getElementById("brand").click();
-    ok("le badge de version s'affiche sur l'accueil",
-       !versionBadge.classList.contains("hidden"));
+    const topbar = window.document.getElementById("topbar");
+    ok("la version est annoncée sur l'accueil",
+       !!window.document.getElementById("version-badge"));
+    ok("et la barre haute y est en mode « accueil »", topbar.dataset.mode === "home");
+    ok("elle est portée par le haut de page, pas par la barre",
+       !topbar.querySelector("#version-badge") &&
+       !!window.document.querySelector("#view-home #version-badge"));
     window.document.getElementById("home-explore").click();
-    ok("il disparaît dès qu'on quitte l'accueil",
-       versionBadge.classList.contains("hidden"));
+    // Les vues sont masquées, pas vidées : ce qui disparaît, c'est l'accueil
+    // tout entier, et la version avec lui.
+    ok("elle s'en va avec l'accueil",
+       window.document.getElementById("view-home").classList.contains("hidden"));
+    ok("et la barre haute redevient une barre d'outil", topbar.dataset.mode === "app");
 }
 
 /* --------------------------------------------- cohérence entre HTML et CSS */
@@ -3094,5 +3164,7 @@ console.log("\n[39] Une adresse venue du bundle n'entre dans un lien qu'après c
        /href="\$\{esc\(tech\.url\)\}"/.test(src) ? "posée sans contrôle" : "");
 }
 
-console.log(`\n${failures === 0 ? "TOUT PASSE" : failures + " ÉCHEC(S)"}\n`);
+// Le nombre d'assertions est affiché plutôt que recopié dans le README, où il
+// avait dérivé de plusieurs centaines sans que personne s'en aperçoive.
+console.log(`\n${failures === 0 ? `TOUT PASSE — ${checks} assertions` : `${failures} ÉCHEC(S) sur ${checks} assertions`}\n`);
 process.exit(failures ? 1 : 0);

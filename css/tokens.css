@@ -61,6 +61,51 @@
     --radius: 8px;
     --radius-sm: 5px;
 
+    /* --- Bandes sombres, verre et reliefs -------------------------------
+
+       Trois familles de jetons ajoutées pour la page publique.
+
+       `--ink*` : les blocs sombres que la page traverse — bénéfices, pied de
+       page. Ils gardent leur propre encre, indépendante du thème : un bloc
+       sombre reste sombre en thème clair, c'est ce contraste qui donne du
+       rythme à une page autrement uniformément blanc cassé.
+
+       `--glass*` : le verre. Une couche translucide, floutée et saturée par
+       `backdrop-filter`, un liseré clair sur le dessus pour la lumière rasante,
+       une ombre portée douce. C'est la matière de la barre haute de l'accueil et
+       des cartes au survol.
+
+       `--shadow-*` : deux hauteurs d'ombre, là où `--shadow` seul obligeait à
+       choisir entre trop et pas assez. */
+
+    --bg-soft: #0a0c10;
+    --bg-tint: rgba(57, 135, 229, 0.07);
+
+    --ink: #070910;
+    --ink-2: #10141d;
+    --ink-text: #eef1f7;
+    --ink-dim: #9aa4b7;
+    --ink-mute: #6c7688;
+    --ink-border: rgba(255, 255, 255, 0.09);
+
+    --glass: rgba(22, 26, 34, 0.58);
+    --glass-strong: rgba(20, 24, 32, 0.86);
+    --glass-border: rgba(255, 255, 255, 0.10);
+    --glass-hi: rgba(255, 255, 255, 0.16);
+    --glass-shadow: 0 10px 40px rgba(0, 0, 0, 0.55), 0 1px 2px rgba(0, 0, 0, 0.5);
+    --overlay: rgba(255, 255, 255, 0.06);
+
+    /* En-tête de tactique du haut de page. Sur fond sombre, l'aplat presque noir
+       du thème clair se confondrait avec la page : c'est une surface claire qui
+       joue alors le rôle de repère. */
+    --tete: var(--surface-3);
+    --tete-ink: var(--text);
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 22px 60px rgba(0, 0, 0, 0.55);
+    --radius-lg: 16px;
+    --radius-pill: 999px;
+
     --font: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
@@ -122,6 +167,33 @@
         --danger: #d03b3b;
         --find: #4a3aa7;
         --shadow: 0 8px 28px rgba(11, 11, 11, 0.12);
+
+        /* Bandes sombres, verre et reliefs — rôles décrits dans le bloc `:root`. */
+
+        --bg-soft: #eae9e2;
+        --bg-tint: rgba(42, 120, 214, 0.06);
+
+        --ink: #0f1320;
+        --ink-2: #1a1f2e;
+        --ink-text: #f5f7fb;
+        --ink-dim: #a9b2c4;
+        --ink-mute: #7c8598;
+        --ink-border: rgba(255, 255, 255, 0.10);
+
+        --glass: rgba(255, 255, 255, 0.62);
+        --glass-strong: rgba(255, 255, 255, 0.88);
+        --glass-border: rgba(11, 11, 11, 0.08);
+        --glass-hi: rgba(255, 255, 255, 0.92);
+        --glass-shadow: 0 10px 34px rgba(11, 11, 11, 0.10), 0 1px 3px rgba(11, 11, 11, 0.06);
+        --overlay: rgba(11, 11, 11, 0.045);
+
+        --tete: var(--ink);
+        --tete-ink: var(--ink-text);
+
+        --shadow-sm: 0 1px 2px rgba(11, 11, 11, 0.06);
+        --shadow-lg: 0 24px 60px rgba(11, 11, 11, 0.14);
+        --radius-lg: 16px;
+        --radius-pill: 999px;
     }
 }
 
@@ -163,4 +235,31 @@
     --danger: #d03b3b;
     --find: #4a3aa7;
     --shadow: 0 8px 28px rgba(11, 11, 11, 0.12);
+
+    /* Bandes sombres, verre et reliefs — rôles décrits dans le bloc `:root`. */
+
+    --bg-soft: #eae9e2;
+    --bg-tint: rgba(42, 120, 214, 0.06);
+
+    --ink: #0f1320;
+    --ink-2: #1a1f2e;
+    --ink-text: #f5f7fb;
+    --ink-dim: #a9b2c4;
+    --ink-mute: #7c8598;
+    --ink-border: rgba(255, 255, 255, 0.10);
+
+    --glass: rgba(255, 255, 255, 0.62);
+    --glass-strong: rgba(255, 255, 255, 0.88);
+    --glass-border: rgba(11, 11, 11, 0.08);
+    --glass-hi: rgba(255, 255, 255, 0.92);
+    --glass-shadow: 0 10px 34px rgba(11, 11, 11, 0.10), 0 1px 3px rgba(11, 11, 11, 0.06);
+    --overlay: rgba(11, 11, 11, 0.045);
+
+    --tete: var(--ink);
+    --tete-ink: var(--ink-text);
+
+    --shadow-sm: 0 1px 2px rgba(11, 11, 11, 0.06);
+    --shadow-lg: 0 24px 60px rgba(11, 11, 11, 0.14);
+    --radius-lg: 16px;
+    --radius-pill: 999px;
 }

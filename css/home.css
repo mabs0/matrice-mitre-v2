@@ -1,148 +1,617 @@
-/* Page d'accueil : point d'entrée « Nouveau layer » / « Ouvrir un layer ». */
+/* ============================================================================
+   Page d'accueil — une page, cinq sections, un pied de page.
+
+   Le rythme de la page tient à un seul principe : le fond change à chaque
+   section. Un blanc cassé unique sur 5 000 px de défilement donne une page
+   plate, où rien n'annonce qu'on change de sujet ; quatre nuances du même blanc
+   cassé, plus deux blocs sombres, donnent des paliers qu'on sent sans les
+   regarder. C'est ce qui manquait, et c'est réglé ici et nulle part ailleurs :
+   chaque `.band` porte son fond, aucun composant ne pose le sien.
+
+   Les jetons de nuance viennent de tokens.css — `--bg`, `--surface`, `--bg-soft`
+   pour les paliers clairs, `--ink` pour les blocs sombres.
+   ========================================================================= */
 
 #view-home { padding: 0; position: relative; }
 
-.home-inner {
-    position: relative;   /* au-dessus de la matrice de fond */
-    z-index: 1;
+.home-page { display: flex; flex-direction: column; }
+
+/* Une section pleine largeur, dont le contenu est ramené au centre. Séparer les
+   deux — le fond qui va d'un bord à l'autre, le contenu qui reste dans sa
+   colonne — est ce qui permet à une bande sombre de traverser la page sans que
+   le texte s'écarte de l'alignement des autres sections. */
+.band { position: relative; }
+.wrap {
     width: 100%;
-    max-width: 1040px;
+    max-width: 1160px;
     margin: 0 auto;
-    padding: 18px 24px 64px;
+    padding: 0 24px;
 }
 
-/* ------------------------------------------- matrice d'exemple en arrière-plan
+/* La barre haute de l'accueil flotte au-dessus du contenu : chaque ancre doit
+   donc s'arrêter sous elle, pas dessous. */
+.band[id] { scroll-margin-top: 84px; }
 
-   Elle défile sans fin, en plusieurs bandes de vitesses différentes. Un masque
-   la creuse au centre, là où se trouvent le titre et le texte : le fond reste
-   perceptible sur les bords sans jamais gêner la lecture. */
+/* --------------------------------------------------------------- en-têtes */
 
-.home-backdrop {
-    /* Intensité du fond, à régler d'ici et de nulle part ailleurs. Au-delà de
-       ~0,4 la trame commence à concurrencer le texte. */
-    --fond: 0.17;
-
-    position: absolute;
-    inset: 0;
-    z-index: 0;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    /* La bande unique se cale vers le haut, derrière le titre, au lieu d'être
-       centrée sur toute la hauteur : c'est là qu'il reste de la place, les
-       cartes et les chiffres étant opaques. */
-    justify-content: flex-start;
-    padding-top: 26px;
-    align-items: flex-start;
-    pointer-events: none;
-    opacity: var(--fond);
-    /* L'échancrure suit le contenu, désormais centré. */
-    mask-image: radial-gradient(ellipse 58% 46% at 50% 30%,
-        transparent 0%, rgba(0, 0, 0, 0.3) 48%, #000 84%);
-}
-/* La trame n'est définie qu'ici, et n'est pas rendue : seules les bandes la
-   reprennent par référence. Surtout pas de `display: none` — voir le markup. */
-.bd-defs { position: absolute; width: 0; height: 0; }
-.bd-band > svg { display: block; }
-
-.bd-cell.lnone { fill: var(--border); opacity: 0.55; }
-.bd-cell.l0 { fill: var(--lvl0); }
-.bd-cell.l1 { fill: var(--lvl1); }
-.bd-cell.l2 { fill: var(--lvl2); }
-.bd-cell.l3 { fill: var(--lvl3); }
-.bd-cell.l4 { fill: var(--lvl4); }
-
-/* En-têtes de tactique : ce sont eux qui font reconnaître la matrice. */
-.bd-head { fill: var(--surface-3); }
-.bd-head-text {
-    fill: var(--text-dim);
-    font-family: var(--font);
-    /* Suit l'agrandissement des cases : à 7,5 px sur des colonnes de 92 px, le
-       nom de tactique n'était plus qu'un trait gris. */
-    font-size: 10px;
+.eyebrow {
+    display: inline-block;
+    font-size: 0.68rem;
     font-weight: 600;
-    letter-spacing: 0.02em;
-}
-
-/* La bande part d'une trame vers la gauche et remonte à zéro : le défilement se
-   fait donc vers la droite, et translater d'exactement une trame ramène au point
-   de départ, d'où la boucle sans couture. `--trame` et `--dur` sont posées par le
-   markup, la géométrie n'est pas redite ici. */
-/* Une bande est un élément HTML et non un groupe SVG : WebKit — donc tout
-   navigateur sur iOS, Firefox compris — n'anime pas de façon fiable une
-   transformation CSS posée à l'intérieur d'un SVG. Le fond restait immobile sur
-   iPhone quand il défilait sur Chrome. */
-.bd-band {
-    flex: none;
-    animation: bd-slide var(--dur, 110s) linear infinite;
-    will-change: transform;
-}
-@keyframes bd-slide {
-    from { transform: translateX(calc(-1 * var(--trame))); }
-    to { transform: translateX(0); }
-}
-
-/* --------------------------------------------------------------------- hero
-
-   Tout est centré, dans l'ordre de lecture : titre, phrase d'accroche, rosace,
-   puis les deux entrées.
-
-   Contrainte de tenue : « Nouveau layer » et « Ouvrir un layer existant »
-   doivent rester entièrement visibles sans défiler. C'est la rosace qui cède la
-   place quand l'écran est bas — sa hauteur est bornée en `vh` —, jamais les
-   cartes, qui sont ce pour quoi on est venu. */
-
-/* La hauteur disponible, une fois la barre haute et la marge du haut retirées.
-   Les deux cartes doivent tenir dedans avec le titre et la rosace : c'est la
-   rosace qui rend la place quand l'écran est bas, jamais les cartes. */
-.home-first {
-    min-height: calc(100dvh - 48px - 18px);
-    display: flex;
-    flex-direction: column;
-    /* Cale vers le haut plutôt qu'au centre : la hauteur ainsi récupérée revient
-       à la rosace, qui est ce qu'on vient regarder. */
-    justify-content: flex-start;
-    gap: clamp(8px, 1.2vh, 14px);
-}
-
-.home-hero {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-    gap: clamp(2px, 0.5vh, 8px);
-}
-
-/* Fréquentation, à la place du bandeau de version — lequel redisait le badge de
-   la barre haute. Reste masqué tant qu'aucune source ne l'alimente. */
-.home-visitors {
-    margin: 0;
-    font-size: 0.7rem;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: var(--text-mute);
+    color: var(--accent);
 }
-.home-visitors b { color: var(--text-dim); font-variant-numeric: tabular-nums; }
-.home-visitors[hidden] { display: none; }
 
-.home-hero h1 {
-    font-size: clamp(1.55rem, 3.6vw, 2.4rem);
-    line-height: 1.15;
-    letter-spacing: -0.02em;
-    margin: 0;
+.band-head { max-width: 640px; margin: 0 0 clamp(28px, 4vw, 48px); }
+.band-head h2, .steps-intro h2, .faq-intro h2, .footer-cta h2 {
+    font-size: clamp(1.6rem, 3.2vw, 2.35rem);
+    line-height: 1.14;
+    letter-spacing: -0.025em;
+    font-weight: 700;
+    margin: 10px 0 0;
+    text-wrap: balance;
+}
+.band-head h2 em, .footer-cta h2 em { font-style: normal; color: var(--accent); }
+.band-head p, .steps-intro p, .faq-intro p {
+    margin: 12px 0 0;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: var(--text-dim);
+    text-wrap: pretty;
+}
+
+/* -------------------------------------------------------------------- hero
+
+   Deux colonnes : la promesse à gauche, la matrice à droite. La matrice n'est
+   pas contenue dans la colonne — elle en sort par la droite et se perd hors de
+   l'écran. C'est ce débordement qui dit « il y en a plus », là où une matrice
+   entière et rétrécie n'aurait dit que « c'est petit ».
+
+   Le fond est le blanc cassé de base, réchauffé d'un halo d'accent très dilué
+   posé derrière la matrice : le seul endroit de la page où de la couleur entre
+   dans le fond, et il est en haut à droite, là où la matrice arrive. */
+.band-hero {
+    background:
+        radial-gradient(1100px 640px at 76% -10%, var(--bg-tint), transparent 62%),
+        var(--bg);
+    overflow: hidden;
+}
+
+.hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.02fr) minmax(0, 1fr);
+    align-items: center;
+    gap: clamp(28px, 4vw, 64px);
+    min-height: min(880px, 100dvh);
+    padding-top: clamp(96px, 13vh, 150px);
+    padding-bottom: clamp(56px, 8vh, 96px);
+}
+
+.hero-copy { display: flex; flex-direction: column; align-items: flex-start; }
+
+/* La pastille de version. Elle porte ce que le badge de la barre haute disait
+   avant, et le dit mieux : dans la barre, « v19.2 » flottait sans contexte ;
+   ici il est adossé à la promesse, et la mention « aucun appel réseau » répond
+   à la première question que se pose un lecteur d'un outil de sécurité. */
+.hero-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px 6px 10px;
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-pill);
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(10px) saturate(150%);
+    backdrop-filter: blur(10px) saturate(150%);
+    box-shadow: inset 0 1px 0 var(--glass-hi), var(--shadow-sm);
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    white-space: nowrap;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.hero-chip .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--good);
+    flex: none;
+}
+.hero-chip b { color: var(--text); font-variant-numeric: tabular-nums; font-weight: 600; }
+.hero-chip em {
+    font-style: normal;
+    color: var(--text-mute);
+    padding-left: 8px;
+    border-left: 1px solid var(--border);
+}
+
+.hero h1 {
+    margin: clamp(18px, 2.4vw, 26px) 0 0;
+    font-size: clamp(2rem, 4.6vw, 3.35rem);
+    line-height: 1.06;
+    letter-spacing: -0.035em;
     font-weight: 700;
     text-wrap: balance;
 }
-.home-hero h1 em { font-style: normal; color: var(--accent); }
+.hero h1 em { font-style: normal; color: var(--accent); }
 
-.home-lead {
-    font-size: 0.92rem;
-    line-height: 1.6;
+.hero-lead {
+    margin: 18px 0 0;
+    max-width: 34em;
+    font-size: 1rem;
+    line-height: 1.62;
     color: var(--text-dim);
-    max-width: 660px;
-    margin: 0;
     text-wrap: pretty;
 }
+
+.hero-cta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: clamp(22px, 3vw, 32px); }
+
+/* --------------------------------------------------- la matrice du haut de page
+
+   Colonnes à largeur fixe, alignées à gauche, qui débordent à droite : la
+   tranche montrée dépend de la place disponible et s'arrête d'elle-même. Le
+   masque du bas et celui de la droite terminent la coupe en fondu — un bord net
+   se lirait comme une erreur de mise en page, un fondu se lit comme une suite.
+
+   Rien n'est coloré : c'est l'état d'une évaluation qui n'a pas commencé. */
+.hero-matrix {
+    position: relative;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    /* La matrice sort de la colonne par la droite, et va jusqu'au bord de la
+       fenêtre — pas jusqu'à une valeur choisie une fois pour toutes. Sur un
+       écran large, une marge fixe la laissait s'arrêter en plein milieu du vide,
+       ce qui se lit comme une image mal cadrée plutôt que comme une coupe.
+
+       1112 px, c'est la colonne de contenu : 1160 de `.wrap` moins ses deux
+       gouttières de 24. La moitié de ce qui reste est exactement la distance du
+       bord de la colonne au bord de la fenêtre. */
+    margin-right: calc(-1 * max(24px, (100vw - 1112px) / 2));
+    -webkit-mask-image:
+        linear-gradient(to bottom, #000 68%, transparent 100%),
+        linear-gradient(to right, #000 74%, transparent 100%);
+    -webkit-mask-composite: source-in;
+    mask-image:
+        linear-gradient(to bottom, #000 68%, transparent 100%),
+        linear-gradient(to right, #000 74%, transparent 100%);
+    mask-composite: intersect;
+}
+
+.hm-grid {
+    display: flex;
+    gap: 5px;
+    align-items: flex-start;
+    padding: 4px 0;
+}
+
+.hm-col { display: flex; flex-direction: column; gap: 3px; flex: 0 0 108px; }
+
+.hm-head {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 38px;
+    padding: 6px 7px;
+    border-radius: 7px;
+    background: var(--tete);
+    color: var(--tete-ink);
+    font-size: 0.62rem;
+    font-weight: 650;
+    line-height: 1.2;
+    text-align: center;
+    text-wrap: balance;
+}
+
+.hm-cell {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    min-height: 30px;
+    padding: 4px 6px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    background: var(--surface-2);
+    color: var(--text-dim);
+    font-size: 0.56rem;
+    line-height: 1.24;
+}
+
+/* ---------------------------------------------------------------- chiffres
+
+   Trois chiffres, sans boîte. Ils vivaient dans une grille cloisonnée de
+   bordures : le chiffre est déjà une forme forte, il n'a pas besoin d'un cadre.
+   Une seule ligne de séparation tient l'ensemble. */
+
+.home-figures {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 14px 28px;
+    width: 100%;
+    max-width: 520px;
+    margin: clamp(30px, 4.5vw, 48px) 0 0;
+    padding-top: 22px;
+    border-top: 1px solid var(--border);
+}
+.figure { display: flex; flex-direction: column; gap: 2px; }
+.figure .v {
+    font-size: clamp(1.6rem, 3.2vw, 2.1rem);
+    font-weight: 300;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+.figure .k {
+    font-size: 0.68rem;
+    color: var(--text-mute);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+/* ------------------------------------------------------------ deux actions
+
+   Premier palier de fond : la surface la plus claire de la page. Les deux
+   cartes y sont traitées à égalité — l'une portait l'accent en bordure et en
+   fond, l'autre non, ce qui se lisait comme un choix déjà fait plutôt que comme
+   deux chemins ouverts. C'est le bouton qui porte l'accent, pas la carte. */
+
+.band-start { background: var(--surface); padding: clamp(64px, 9vw, 112px) 0; }
+
+.home-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+    gap: 18px;
+}
+
+.action-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    text-align: left;
+    padding: 26px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+.action-card:hover {
+    border-color: var(--border-strong);
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-lg);
+}
+
+.action-card .glyph { display: block; color: var(--accent); }
+.action-card .glyph svg { display: block; width: 26px; height: 26px; }
+.action-card h3 { margin: 0; font-size: 1.05rem; font-weight: 650; letter-spacing: -0.015em; }
+.action-card p { margin: 0; font-size: 0.83rem; line-height: 1.6; color: var(--text-dim); flex: 1 1 auto; }
+.action-card .btn { align-self: flex-start; margin-top: 4px; }
+
+.drop-zone {
+    border: 1px dashed var(--border-strong);
+    border-radius: var(--radius);
+    padding: 16px;
+    text-align: center;
+    font-size: 0.76rem;
+    color: var(--text-mute);
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.drop-zone:hover, .drop-zone.hover { border-color: var(--accent); color: var(--accent); background: var(--accent-wash); }
+.drop-zone b { color: var(--text); font-weight: 600; }
+.drop-zone.hover b { color: var(--accent); }
+
+/* --------------------------------------------------------------- le parcours
+
+   Trois temps, numérotés, reliés par un filet vertical qui part de chaque numéro
+   et descend vers le suivant. Le dernier n'en a pas : la ligne s'arrête où le
+   parcours s'arrête.
+
+   Le titre reste collé en haut pendant qu'on parcourt les trois étapes — sur un
+   écran haut, on lit « De l'évaluation à la cartographie » en même temps que
+   l'étape qu'on regarde, ce qui est précisément le rapport entre les deux. */
+
+.band-steps { background: var(--bg-soft); padding: clamp(64px, 9vw, 112px) 0; }
+
+.steps-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+    gap: clamp(32px, 5vw, 80px);
+    align-items: start;
+}
+.steps-intro { position: sticky; top: 108px; }
+
+.home-steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: clamp(28px, 4vw, 44px);
+}
+
+/* Le décalage de la deuxième étape casse l'alignement des trois blocs : le
+   parcours descend en escalier au lieu d'être une liste, et le filet qui les
+   relie devient visible en tant que trajet. */
+.step { position: relative; padding-left: 62px; }
+.step:nth-child(2) { margin-left: clamp(0px, 4vw, 52px); }
+
+.step:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    left: 21px;
+    top: 46px;
+    bottom: calc(-1 * clamp(28px, 4vw, 44px));
+    width: 1px;
+    background: linear-gradient(to bottom, var(--border-strong), transparent);
+}
+
+.step-num {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: inline-grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--ink);
+    color: var(--ink-text);
+    font-size: 0.78rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+    box-shadow: var(--shadow-sm);
+}
+
+.step h3 {
+    margin: 8px 0 8px;
+    font-size: 1.12rem;
+    font-weight: 650;
+    letter-spacing: -0.015em;
+}
+.step p { margin: 0; font-size: 0.87rem; line-height: 1.65; color: var(--text-dim); max-width: 44em; }
+
+/* --------------------------------------------------------------- bénéfices
+
+   Le contraste s'inverse : fond clair, cartes sombres. C'est le seul endroit de
+   la page où cela arrive, et c'est ce qui en fait le point d'arrêt du regard —
+   on y annonce le résultat, pas le mode d'emploi.
+
+   Le survol pose un halo centré sur le pointeur. Les deux variables sont mises à
+   jour par home.js ; sans elles — au clavier, au doigt — le halo se centre au
+   milieu de la carte, ce qui reste correct. */
+
+.band-benefits { background: var(--bg); padding: clamp(64px, 9vw, 112px) 0; }
+
+.benefits {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(232px, 1fr));
+    gap: 16px;
+}
+
+.benefit-card {
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 22px;
+    border-radius: var(--radius-lg);
+    border: 1px solid transparent;
+    background: var(--ink);
+    color: var(--ink-text);
+    box-shadow: var(--shadow-lg);
+    transition: transform 0.22s ease, border-color 0.22s ease;
+}
+.benefit-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(320px circle at var(--mx, 50%) var(--my, 50%),
+        rgba(255, 255, 255, 0.10), transparent 62%);
+    opacity: 0;
+    transition: opacity 0.25s ease;
+    pointer-events: none;
+}
+.benefit-card:hover { transform: translateY(-4px); border-color: var(--ink-border); }
+.benefit-card:hover::before { opacity: 1; }
+
+.benefit-card h3 {
+    position: relative;
+    margin: 0;
+    font-size: 0.98rem;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+}
+.benefit-card p {
+    position: relative;
+    margin: 0;
+    font-size: 0.8rem;
+    line-height: 1.62;
+    color: var(--ink-dim);
+}
+
+.benefit-visual {
+    position: relative;
+    display: block;
+    padding: 14px;
+    border-radius: 10px;
+    background: var(--ink-2);
+    border: 1px solid var(--ink-border);
+}
+.benefit-visual svg { display: block; width: 100%; height: auto; }
+
+/* Les vignettes reprennent la rampe de maturité, en sourdine : elles évoquent la
+   matrice sans prétendre en être une lecture. */
+.vg-ok { fill: rgba(96, 219, 137, 0.55); }
+.vg-mid { fill: rgba(176, 133, 14, 0.6); }
+.vg-low { fill: rgba(165, 42, 36, 0.7); }
+.vg-track { stroke: rgba(255, 255, 255, 0.10); }
+.vg-arc { stroke: var(--accent); }
+.vg-line { stroke: var(--accent); }
+.vg-area { fill: rgba(57, 135, 229, 0.18); }
+.vg-dots circle { fill: rgba(255, 255, 255, 0.16); }
+.vg-spot { fill: var(--accent); }
+
+/* --------------------------------------------------------------------- FAQ */
+
+.band-faq { background: var(--surface); padding: clamp(64px, 9vw, 112px) 0; }
+
+.faq-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    gap: clamp(32px, 5vw, 80px);
+    align-items: start;
+}
+.faq-intro { position: sticky; top: 108px; }
+
+.faq-list { display: flex; flex-direction: column; gap: 8px; }
+
+.faq-item {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface-2);
+    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.faq-item:hover { border-color: var(--border-strong); }
+.faq-item[open] { border-color: var(--border-strong); box-shadow: var(--shadow-sm); }
+
+.faq-item summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 16px 18px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    list-style: none;
+}
+/* Le triangle par défaut de Safari ne se retire que par ce pseudo-élément. */
+.faq-item summary::-webkit-details-marker { display: none; }
+
+/* Le signe est un « + » qui pivote en « × » : deux traits, une rotation, aucune
+   image. Fermé il annonce qu'il y a quelque chose dessous, ouvert il annonce
+   qu'on peut refermer. */
+.faq-sign {
+    position: relative;
+    flex: none;
+    width: 14px;
+    height: 14px;
+    transition: transform 0.22s ease;
+}
+.faq-sign::before, .faq-sign::after {
+    content: "";
+    position: absolute;
+    inset: 50% 0 auto 0;
+    height: 1.5px;
+    border-radius: 2px;
+    background: var(--text-dim);
+}
+.faq-sign::after { transform: rotate(90deg); }
+.faq-item[open] .faq-sign { transform: rotate(135deg); }
+
+.faq-answer { padding: 0 18px 18px; }
+.faq-answer p {
+    margin: 0;
+    font-size: 0.85rem;
+    line-height: 1.68;
+    color: var(--text-dim);
+    max-width: 62ch;
+}
+
+/* --------------------------------------------------------------- pied de page
+
+   Bloc sombre, en deux temps : le dernier appel à l'action, puis les colonnes.
+   Il ferme la page au lieu de la laisser s'arrêter — descendre jusqu'en bas
+   d'une page unique ne doit pas être un cul-de-sac, d'où les ancres qui
+   remontent vers les sections. */
+
+.site-footer { background: var(--ink); color: var(--ink-text); }
+.site-footer .wrap { padding-top: clamp(64px, 9vw, 104px); padding-bottom: 28px; }
+
+.footer-cta { text-align: center; max-width: 640px; margin: 0 auto clamp(52px, 8vw, 88px); }
+.footer-cta h2 { color: var(--ink-text); }
+.footer-cta p { margin: 14px 0 0; font-size: 0.92rem; line-height: 1.6; color: var(--ink-dim); }
+.footer-cta-actions { display: flex; justify-content: center; gap: 10px; margin-top: 26px; }
+
+/* Sur le bloc sombre, le bouton principal s'inverse : un aplat clair est le
+   contraste le plus fort dont dispose un fond sombre, et c'est le dernier appel
+   de la page. L'accent, lui, garde sa force sur les fonds clairs. */
+.site-footer .btn-primary {
+    background: var(--ink-text);
+    border-color: var(--ink-text);
+    color: var(--ink);
+}
+.site-footer .btn-primary:hover {
+    background: #ffffff;
+    border-color: #ffffff;
+    color: var(--ink);
+}
+
+.footer-cols {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) repeat(auto-fit, minmax(140px, 1fr));
+    gap: 32px;
+    padding-top: clamp(32px, 5vw, 46px);
+    border-top: 1px solid var(--ink-border);
+}
+
+.footer-mark {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 0.95rem;
+    letter-spacing: -0.01em;
+}
+.footer-mark .brand-mascot { width: 22px; height: 22px; }
+.footer-brand p {
+    margin: 12px 0 0;
+    font-size: 0.8rem;
+    line-height: 1.6;
+    color: var(--ink-dim);
+    max-width: 30em;
+}
+
+.footer-col { display: flex; flex-direction: column; gap: 10px; }
+.footer-col h4 {
+    margin: 0 0 2px;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+}
+.footer-col a {
+    font-size: 0.82rem;
+    color: var(--ink-dim);
+    text-decoration: none;
+    width: fit-content;
+    transition: color 0.15s ease;
+}
+.footer-col a:hover { color: var(--ink-text); text-decoration: underline; text-underline-offset: 3px; }
+
+.home-foot {
+    margin: clamp(40px, 6vw, 64px) 0 0;
+    padding-top: 20px;
+    border-top: 1px solid var(--ink-border);
+    font-size: 0.72rem;
+    color: var(--ink-mute);
+    text-align: center;
+}
+
+/* Dans le pied de page, la mascotte se pose sur du sombre quel que soit le
+   thème : ses couleurs ne peuvent pas venir des jetons de surface. */
+.site-footer .m-eye { fill: var(--ink); }
+.site-footer .m-pupil { fill: var(--ink-text); }
 
 /* ------------------------------------------------------------------ rosace
 
@@ -274,210 +743,55 @@
     letter-spacing: 0.08em;
 }
 
-/* Un fond qui défile et une rosace qui se dessine n'ont rien d'indispensable. */
+/* ------------------------------------------------- mouvement réduit, écrans
+
+   Une rosace qui se dessine n'a rien d'indispensable. */
 @media (prefers-reduced-motion: reduce) {
-    .bd-band { animation: none; }
     .ros-web-group { animation: none; }
     .ros-shape { animation: none; stroke-dashoffset: 0; fill-opacity: 0.17; }
     .ros-dot { animation: none; opacity: 1; }
+    .action-card, .benefit-card, .faq-sign, .nav-link { transition: none; }
 }
 
-/* Sur un écran étroit, le contenu occupe toute la largeur : le masque prévu pour
-   un bloc centré recouvrait alors presque tout, et le fond disparaissait. On
-   resserre l'échancrure sur le seul bloc de texte du haut — plus bas, les cartes
-   sont opaques, elles se protègent d'elles-mêmes. */
-@media (max-width: 700px) {
-    .home-backdrop {
-        mask-image: radial-gradient(ellipse 92% 24% at 50% 14%,
-            transparent 0%, rgba(0, 0, 0, 0.3) 52%, #000 86%);
-        /* L'échancrure resserrée expose beaucoup plus de trame qu'en colonne :
-           à intensité égale la page devenait bariolée. */
-        --fond: 0.11;
+/* La passe responsive complète viendra ensuite : un téléphone n'est pas un
+   bureau rétréci, et le tableau de bord de la matrice demande son propre
+   traitement. Ce qui suit garantit seulement qu'aucune section ne déborde ni ne
+   devient illisible en attendant. */
+
+/* Sous 1000 px la matrice n'a plus la place de montrer assez de colonnes pour
+   se faire reconnaître : la promesse reprend toute la largeur et la matrice
+   passe dessous, à cheval sur le bord droit. */
+@media (max-width: 1000px) {
+    .hero {
+        grid-template-columns: minmax(0, 1fr);
+        min-height: 0;
+        gap: 36px;
     }
+    .hero-matrix { margin-right: calc(-1 * max(16px, (100vw - 1112px) / 2)); }
+
+    .steps-grid, .faq-grid { grid-template-columns: minmax(0, 1fr); }
+    .steps-intro, .faq-intro { position: static; }
+    .step:nth-child(2) { margin-left: 0; }
 }
 
-/* Deux cartes empilées ne tiennent pas dans un écran de téléphone avec le titre
-   et la rosace au-dessus. Plutôt que de tout comprimer jusqu'à l'illisible, on
-   rend la hauteur libre : le défilement redevient normal, et c'est la rosace qui
-   part la première puisqu'elle n'est qu'un exemple. */
-@media (max-width: 700px), (max-height: 700px) {
-    .home-first { min-height: 0; gap: 24px; }
-}
-
-@media (max-width: 560px) {
-    .home-inner { padding: 32px 16px 44px; }
-    .rosace { height: clamp(180px, 30vh, 260px); }
-    .step { padding: 14px 15px 15px; }
-    .home-foot { margin-top: 26px; }
-}
-
-/* ------------------------------------------------------------ deux actions */
-
-.home-actions {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
-    gap: 16px;
-}
-
-/* Les deux cartes sont traitées à égalité.
-   L'une portait la couleur d'accent en bordure et en fond, l'autre non : mises
-   côte à côte, cela se lisait comme un choix déjà fait plutôt que comme deux
-   chemins ouverts. C'est le bouton qui porte l'accent, pas la carte.
-
-   Reste le relief qu'elles avaient : un fond très légèrement teinté d'accent et
-   la bordure qui s'allume au survol, sur les deux à égalité cette fois. Une
-   carte parfaitement plate ne se distinguait plus assez du fond de page. */
-.action-card {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    text-align: left;
-    padding: 24px;
-    background: linear-gradient(180deg, var(--accent-wash), transparent 70%), var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
-}
-.action-card:hover {
-    border-color: var(--accent);
-    transform: translateY(-2px);
-    box-shadow: var(--shadow);
-}
-
-.action-card .glyph { display: block; color: var(--accent); }
-.action-card .glyph svg { display: block; width: 26px; height: 26px; }
-.action-card h2 { margin: 0; font-size: 1.02rem; font-weight: 650; letter-spacing: -0.01em; }
-.action-card p { margin: 0; font-size: 0.8rem; line-height: 1.55; color: var(--text-dim); flex: 1 1 auto; }
-.action-card .btn { align-self: flex-start; margin-top: 4px; }
-
-.drop-zone {
-    border: 1px dashed var(--border-strong);
-    border-radius: var(--radius-sm);
-    padding: 14px;
-    text-align: center;
-    font-size: 0.76rem;
-    color: var(--text-mute);
-    cursor: pointer;
-    transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
-}
-.drop-zone:hover, .drop-zone.hover { border-color: var(--accent); color: var(--accent); background: var(--accent-wash); }
-.drop-zone b { color: var(--text); font-weight: 600; }
-.drop-zone.hover b { color: var(--accent); }
-
-/* -------------------------------------------------------------- chiffres
-
-   Trois chiffres, sans boîte.
-   Ils vivaient dans une grille cloisonnée de bordures, juste au-dessus de trois
-   cartes elles aussi encadrées : quatre rectangles empilés sur deux rangs, et
-   l'accueil finissait en tableur. Le chiffre est déjà une forme forte, il n'a
-   pas besoin d'un cadre pour se voir. Une seule ligne de séparation tient
-   l'ensemble. */
-
-.home-figures {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 18px 32px;
-    margin: clamp(40px, 7vh, 76px) 0 0;
-    padding-top: 26px;
-    border-top: 1px solid var(--border);
-}
-.figure { display: flex; flex-direction: column; gap: 2px; }
-.figure .v {
-    font-size: clamp(1.7rem, 3.6vw, 2.3rem);
-    font-weight: 300;
-    letter-spacing: -0.03em;
-    line-height: 1;
-    font-variant-numeric: tabular-nums;
-}
-.figure .k {
-    font-size: 0.7rem;
-    color: var(--text-mute);
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+@media (max-width: 700px) {
+    .band-hero, .band-start, .band-steps, .band-benefits, .band-faq { padding-left: 0; padding-right: 0; }
+    .benefits { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+    .footer-cols { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+    .hero-cta .btn, .footer-cta-actions .btn { flex: 1 1 auto; justify-content: center; }
 }
 
 @media (max-width: 560px) {
-    .home-figures { grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .wrap { padding: 0 16px; }
+    .hero { padding-top: 92px; }
+    .hero-chip em { display: none; }
+    .home-figures { grid-template-columns: repeat(3, 1fr); gap: 10px; max-width: none; }
     .figure .k { font-size: 0.6rem; letter-spacing: 0.03em; }
-}
-
-/* ------------------------------------------- questionnaire, matrice, export
-
-   Les trois temps du parcours, dans l'ordre.
-
-   Plus de cadre autour de chacun : trois rectangles bordés sous trois autres
-   rectangles bordés, c'était la répétition qui rendait la page raide. Le
-   parcours est porté par un filet horizontal qui traverse les trois numéros —
-   il dit la suite mieux qu'une flèche glissée entre deux boîtes, et il tient
-   sur une ligne quand l'écran est large comme quand il ne l'est pas. */
-
-.home-steps {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 10px 34px;
-    list-style: none;
-    margin: clamp(30px, 5vh, 52px) 0 0;
-    padding: 0;
-}
-
-.step { position: relative; padding-top: 34px; }
-
-/* Le filet part du numéro et file vers le suivant. Le dernier n'en a pas :
-   la ligne s'arrête où le parcours s'arrête. */
-.step:not(:last-child)::after {
-    content: "";
-    position: absolute;
-    top: 12px;
-    left: 32px;
-    right: -34px;
-    height: 1px;
-    background: var(--border);
-}
-
-.step-num {
-    position: absolute;
-    top: 0;
-    left: 0;
-    display: inline-grid;
-    place-items: center;
-    width: 25px;
-    height: 25px;
-    border-radius: 50%;
-    background: var(--bg);
-    border: 1px solid var(--accent);
-    color: var(--accent);
-    font-size: 0.7rem;
-    font-weight: 700;
-}
-
-.step h3 { margin: 0 0 6px; font-size: 0.88rem; font-weight: 650; }
-.step p { margin: 0; font-size: 0.78rem; line-height: 1.6; color: var(--text-dim); }
-
-@media (max-width: 700px) {
-    .home-steps { grid-template-columns: 1fr; gap: 22px; }
-    /* Empilés, les numéros s'alignent verticalement : le filet suit, à la
-       verticale, et relie chaque étape à la suivante. */
-    .step { padding: 0 0 0 40px; min-height: 25px; }
-    .step:not(:last-child)::after {
-        top: 30px;
-        bottom: -22px;
-        left: 12px;
-        right: auto;
-        width: 1px;
-        height: auto;
-    }
-}
-
-.home-secondary { text-align: center; margin-top: 26px; }
-
-.home-foot {
-    margin-top: 34px;
-    padding-top: 18px;
-    border-top: 1px solid var(--border);
-    font-size: 0.7rem;
-    color: var(--text-mute);
-    line-height: 1.6;
-    text-align: center;
+    .action-card { padding: 20px; }
+    .step { padding-left: 52px; }
+    .step-num { width: 38px; height: 38px; font-size: 0.72rem; }
+    .step:not(:last-child)::after { left: 18px; top: 40px; }
+    .rosace { height: clamp(180px, 30vh, 260px); }
 }
 
 /* ------------------------------------------------------- champs des modales */

@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="MAPTRIX">
+    <!--
+        La mascotte, en icône d'onglet. Même tracé que le <symbol id="mascot">
+        d'index.html, à trois différences près, toutes dictées par la taille de
+        rendu réelle — 16 px de côté dans la barre d'adresse :
+
+          - un fond sombre plein, parce qu'un dessin détouré disparaît sur les
+            onglets clairs comme sur les sombres, et que l'icône doit tenir dans
+            les deux ;
+          - des tentacules plus épais, sinon ils se réduisent à un gris sale ;
+          - des yeux légèrement agrandis, seuls traits encore lisibles à cette
+            taille — c'est par eux qu'on reconnaît le poulpe.
+
+        Les couleurs sont écrites en dur : un fichier d'icône est chargé hors du
+        document, aucune variable de thème ne l'atteint.
+    -->
+    <rect width="64" height="64" rx="14" fill="#0f1320"/>
+    <!-- Le tracé occupe environ 46 × 41 dans un carré de 64 : à 16 px cela laisse
+         une bordure vide de trois pixels sur quatre côtés, et le poulpe s'y perd.
+         On l'agrandit autour de son propre centre (32, 32,5) pour qu'il remplisse
+         la tuile, sans toucher au dessin lui-même. -->
+    <g transform="translate(32 32) scale(1.14) translate(-32 -32.5)">
+        <g fill="none" stroke="#3b8fe8" stroke-width="4.6" stroke-linecap="round">
+            <path d="M18 33c-3 8-1 14-6.5 17"/>
+            <path d="M24.5 35c-2 9 0 14-4.5 18"/>
+            <path d="M30 36c-1 9 1 14-2 19"/>
+            <path d="M34 36c1 9-1 14 2 19"/>
+            <path d="M39.5 35c2 9 0 14 4.5 18"/>
+            <path d="M46 33c3 8 1 14 6.5 17"/>
+        </g>
+        <path d="M14 36C14 12 50 12 50 36Z" fill="#3b8fe8"/>
+        <circle cx="25.4" cy="25.6" r="5.6" fill="#ffffff"/>
+        <circle cx="38.6" cy="25.6" r="5.6" fill="#ffffff"/>
+        <circle cx="26.8" cy="26.6" r="2.6" fill="#0f1320"/>
+        <circle cx="40" cy="26.6" r="2.6" fill="#0f1320"/>
+    </g>
+</svg>
