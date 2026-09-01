@@ -760,3 +760,44 @@
     .tech-desc { max-height: 150px; padding: 10px 12px; }
     .panel-cols { gap: 14px; }
 }
+
+/* ------------------------------------------ la barre d'outils sur un téléphone
+
+   Ce bloc vit en fin de feuille, et pas avec les autres règles d'écran étroit du
+   tableau de bord : les déclarations de base de la barre d'outils sont écrites
+   plus haut, à la même spécificité, et c'est la dernière de la source qui gagne.
+   Placé là-haut, ce bloc était simplement ignoré — `overflow: hidden` et le
+   rembourrage d'origine reprenaient la main sans que rien ne le signale.
+
+   La barre défile au lieu de se comprimer. Sous ~400 px, ses réglages ne
+   rentraient plus : le champ de recherche tombait à son minimum, la légende à
+   zéro, et le reste débordait par-dessus le rembourrage. « Méthode de notation »
+   finissait collé au bord, sans même le millimètre qui sépare un bouton d'un
+   cadre. Comprimer n'avait plus rien à donner.
+
+   En défilement horizontal, chaque réglage garde sa taille lisible, la barre
+   reste sur une ligne — deux demi-lignes d'outils valent moins qu'une ligne
+   complète, c'est la règle de ce panneau — et la légende redevient atteignable
+   au doigt en portrait, là où elle était coupée net. */
+@media (max-width: 900px) {
+    #matrix-toolbar {
+        overflow-x: auto;
+        overflow-y: hidden;
+        scrollbar-width: none;
+    }
+    #matrix-toolbar::-webkit-scrollbar { display: none; }
+
+    /* Le rembourrage de droite d'un conteneur qui défile n'est pas rendu au bout
+       de sa course : c'est un élément de flux qui le garantit. */
+    #matrix-toolbar::after { content: ""; flex: 0 0 6px; }
+
+    /* Resserré pour que les trois réglages tiennent avec une vraie marge à
+       droite sur un écran de 390 px, la largeur la plus répandue. Le défilement
+       reste là comme filet, pour les écrans plus étroits encore. */
+    #matrix-toolbar { gap: 6px; }
+    #matrix-toolbar .btn-sm { padding: 5px 8px; }
+    #matrix-search { flex: 0 0 auto; width: 104px; }
+    /* Elle ne se comprime plus et n'a plus son propre défilement : elle suit
+       celui de la barre, d'un seul geste. */
+    #matrix-legend { flex: 0 0 auto; overflow-x: visible; }
+}

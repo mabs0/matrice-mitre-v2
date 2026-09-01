@@ -2098,9 +2098,17 @@ console.log("\n[30] Tenue sur écran étroit");
     ok("l'état du menu est annoncé, pas seulement dessiné",
        /aria-expanded="false"/.test(readFileSync(`${ROOT}/index.html`, "utf8")) &&
        /setAttribute\("aria-expanded"/.test(readFileSync(`${ROOT}/js/main.js`, "utf8")));
-    ok("et la pastille se resserre sur un téléphone",
-       /#topbar\[data-mode="home"\]\s*\{[^}]*height:\s*52px/.test(narrow),
-       narrow.replace(/\s+/g, " ").slice(0, 120));
+    // Trois hauteurs, de la plus grande à la plus petite : au repos sur un
+    // bureau, une fois la page défilée, puis sur un téléphone. Comparées plutôt
+    // que fixées, pour que le réglage reste libre sans que l'ordre se perde.
+    const hauteurs = [
+        /#topbar\[data-mode="home"\]\s*\{[^}]*height:\s*(\d+)px/.exec(base)?.[1],
+        /#topbar\[data-mode="home"\]\.scrolled\s*\{[^}]*height:\s*(\d+)px/.exec(base)?.[1],
+        /#topbar\[data-mode="home"\]\s*\{[^}]*height:\s*(\d+)px/.exec(narrow)?.[1],
+    ].map(Number);
+    ok("la pastille se resserre en défilant, et sur un téléphone",
+       hauteurs.every(h => h > 0) && hauteurs[1] < hauteurs[0] && hauteurs[2] < hauteurs[0],
+       hauteurs.join(" / "));
     // La marque ne porte plus de sous-titre : « MAPTRIX maturité cyber »
     // répétait dans la barre ce que la page dit déjà en grand juste dessous.
     ok("la marque se réduit à son nom",

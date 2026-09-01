@@ -183,12 +183,22 @@
        gouttières de 24. La moitié de ce qui reste est exactement la distance du
        bord de la colonne au bord de la fenêtre. */
     margin-right: calc(-1 * max(24px, (100vw - 1112px) / 2));
+    /* Deux fondus, deux rôles.
+
+       Celui de droite dit qu'il y a une suite : la matrice sort du cadre, et la
+       coupe doit se lire comme un cadrage et non comme une erreur. Il commence
+       tôt, à 74 %, et c'est voulu.
+
+       Celui du bas ne dit rien de tel, il termine seulement le bloc. Il partait
+       de 68 % : un tiers de la matrice à demi effacé, une grande zone molle en
+       bas de l'écran d'accueil. Ramené à 86 %, il ne fait plus que poser le bord
+       — assez pour qu'il ne soit pas net, pas assez pour manger des cases. */
     -webkit-mask-image:
-        linear-gradient(to bottom, #000 68%, transparent 100%),
+        linear-gradient(to bottom, #000 86%, transparent 100%),
         linear-gradient(to right, #000 74%, transparent 100%);
     -webkit-mask-composite: source-in;
     mask-image:
-        linear-gradient(to bottom, #000 68%, transparent 100%),
+        linear-gradient(to bottom, #000 86%, transparent 100%),
         linear-gradient(to right, #000 74%, transparent 100%);
     mask-composite: intersect;
 }
