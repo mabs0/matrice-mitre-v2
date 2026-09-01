@@ -86,7 +86,7 @@ export function renderMatrix(app) {
                         <input type="search" id="dash-cve" placeholder="CVE-2026-2525" disabled
                                autocomplete="off" aria-describedby="dash-cve-note">
                         <p class="panel-note" id="dash-cve-note">
-                            Retrouver les techniques ATT&amp;CK liées à une vulnérabilité —
+                            Retrouver les techniques ATT&amp;CK liées à une vulnérabilité,
                             à brancher sur <a href="https://galeax.github.io/CVE2CAPEC/"
                             target="_blank" rel="noopener">CVE2CAPEC</a>.
                         </p>
@@ -310,7 +310,7 @@ function buildExportPanel(app) {
         <div class="field" id="ex-pass-field" style="padding:6px 7px 10px;">
             <label for="ex-pass">Clé de chiffrement</label>
             <input type="password" id="ex-pass" autocomplete="new-password">
-            <span class="help" id="ex-pass-help">Sans elle, impossible de relire le fichier —
+            <span class="help" id="ex-pass-help">Sans elle, impossible de relire le fichier.
                 l'outil ne la conserve nulle part.</span>
         </div>
         <div class="sep"></div>
@@ -337,7 +337,7 @@ function buildExportPanel(app) {
         passField.style.opacity = crypt.checked ? "1" : "0.4";
         $("#ex-pass").disabled = !crypt.checked;
         help.textContent = crypt.checked
-            ? "Sans elle, impossible de relire le fichier — l'outil ne la conserve nulle part."
+            ? "Sans elle, impossible de relire le fichier. L'outil ne la conserve nulle part."
             : "Le fichier sortira en clair : lisible par quiconque y a accès.";
     };
 
@@ -355,7 +355,7 @@ function buildExportPanel(app) {
         try {
             await exportJSON(app.layer, passphrase);
             toast(`${exportName(app.layer)}${passphrase ? "-chiffre" : ""}.json exporté`
-                + `${passphrase ? "" : " — en clair"}.`);
+                + `${passphrase ? "" : ", en clair"}.`);
         } catch (err) {
             toast(`Export impossible : ${err.message}`, "error");
         }
@@ -437,7 +437,7 @@ function paint(app) {
         head.innerHTML = `
             <div class="t-name">${esc(tactic.name)}</div>
             <div class="t-bar"><span style="width:${pct}%"></span></div>`;
-        head.title = `${tactic.id} — ${tactic.name} · ${shown.length}`
+        head.title = `${tactic.id} ${tactic.name} · ${shown.length}`
             + `${shown.length !== all.length ? `/${all.length}` : ""} techniques, ${scored} évaluées`;
         column.appendChild(head);
 
@@ -543,7 +543,7 @@ function paintMitigations(app) {
         <ul class="mit-list">
             ${app.data.mitigations.map(m => {
                 const level = levels.get(m.id);
-                const note = level === undefined ? "—" : formatScore(level);
+                const note = level === undefined ? "-" : formatScore(level);
                 const classe = level === undefined ? "mit-score vide" : `mit-score l${Math.round(level)}`;
                 // M1055 décrit les cas où l'on choisit délibérément de ne pas
                 // atténuer : il n'y a pas de maturité à mesurer, donc pas de
@@ -553,7 +553,7 @@ function paintMitigations(app) {
                 return `<li>
                     <button class="mit-row${choisie ? " selected" : ""}" data-mitigation="${esc(m.id)}"
                             aria-pressed="${choisie}"
-                            title="${esc(m.id)} — ${esc(m.name)}">
+                            title="${esc(m.id)} : ${esc(m.name)}">
                         <span class="${classe}">${note}</span>
                         <span class="mit-id">${esc(m.id)}</span>
                         <span class="mit-name">${esc(m.name)}</span>
@@ -619,7 +619,7 @@ function cellFor(app, tech, scores, query, highlighted, isSub = false) {
 
     button.innerHTML = `<span class="c-id">${esc(tech.id)}</span> ${score}${subs}
         <span class="c-name">${esc(tech.name)}</span>`;
-    button.title = `${tech.id} — ${tech.name}`;
+    button.title = `${tech.id} : ${tech.name}`;
     button.onclick = () => openTechnique(app, tech, scores);
     return button;
 }
@@ -654,7 +654,7 @@ function openTechnique(app, tech, scores) {
         const assessable = (getQuestionnaire(id)?.questions.length ?? 0) > 0;
         return `
             <li class="mit-row">
-                <span class="m-lvl ${level !== null ? `l${Math.round(level)}` : ""}">${level !== null ? formatScore(level) : "—"}</span>
+                <span class="m-lvl ${level !== null ? `l${Math.round(level)}` : ""}">${level !== null ? formatScore(level) : "-"}</span>
                 <span class="m-id">${esc(id)}</span>
                 <span class="m-name" title="${esc(m.name)}">${esc(m.name)}</span>
                 ${assessable
@@ -695,7 +695,7 @@ function openTechnique(app, tech, scores) {
 
     const panel = openModal(`
         <div class="modal-head">
-            <h3 style="margin:0;font-size:1.05rem;">${esc(tech.id)} — ${esc(tech.name)}</h3>
+            <h3 style="margin:0;font-size:1.05rem;">${esc(tech.id)} : ${esc(tech.name)}</h3>
             <div class="tech-meta">
                 ${stateTag}
                 ${tech.platforms.map(p => `<span class="tag">${esc(p)}</span>`).join("")}

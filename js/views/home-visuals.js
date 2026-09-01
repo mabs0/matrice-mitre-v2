@@ -172,7 +172,7 @@ export function rosace(data, reels = null) {
                     <circle class="${classes}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.6"
                             style="--i:${i}"/>
                     ${cible}
-                    <title>${esc(noms[i])} — ${mot}</title>
+                    <title>${esc(noms[i])} : ${mot}</title>
                 </g>`;
     }).join("");
 
@@ -181,7 +181,7 @@ export function rosace(data, reels = null) {
     // l'étendue du référentiel, ce qui n'a aucun sens.
     const average = notes.length
         ? (sum / notes.length).toFixed(1).replace(".", ",")
-        : "—";
+        : "-";
 
     const label = reels
         ? `Rosace de maturité : niveau atteint sur les ${noms.length} tactiques d'ATT&CK Enterprise`
@@ -287,32 +287,50 @@ export function rosaceAutonome(svg) {
 
    Elle remplace le fond défilant qui occupait toute la page. Ce fond avait un
    défaut de fond : pour ne pas gêner la lecture il fallait le diluer à 17 %
-   d'opacité et le creuser d'un masque — c'est-à-dire le rendre méconnaissable
+   d'opacité et le creuser d'un masque, c'est-à-dire le rendre méconnaissable
    pour qu'il devienne supportable. Une matrice montrée franchement, à côté du
    titre plutôt que derrière, dit la même chose sans rien coûter à la lecture.
 
-   Elle est vide : ni couleurs, ni notes. C'est le premier écran d'une évaluation
-   qui n'a pas commencé, et c'est exactement ce que voit quelqu'un qui arrive.
-   Les niveaux viendront quand ils voudront dire quelque chose.
-
    Sept colonnes seulement : au-delà, les cases deviennent trop étroites pour que
    le nom d'une technique s'y lise, et une matrice illisible ne prouve rien. La
-   coupe est franche et assumée — le dégradé qui la termine dit qu'il y a une
-   suite, sans faire croire qu'on la voit. */
+   coupe est franche et assumée, le dégradé qui la termine dit qu'il y a une
+   suite sans faire croire qu'on la voit. */
 const HERO = {
     premiere: "initial-access",
     derniere: "credential-access",
     /* Assez de cases pour qu'on voie une colonne, pas assez pour qu'on la lise
        en entier : le bas est estompé de toute façon. */
     lignes: 15,
+    /* Part de cases laissées sans niveau. Une matrice entièrement colorée n'a
+       jamais existé : il reste toujours des techniques qu'aucune mesure ne
+       couvre, et c'est justement ce que l'outil sert à voir. */
+    partVides: 0.22,
 };
+
+/**
+ * Générateur déterministe.
+ *
+ * Les couleurs doivent être les mêmes d'un rendu à l'autre : tirées au hasard à
+ * chaque affichage, la matrice changerait de visage à chaque retour sur
+ * l'accueil, et une page qui ne se ressemble pas d'une visite à l'autre ne se
+ * mémorise pas. La graine est fixe, la suite est reproductible.
+ */
+function suite(graine) {
+    let n = graine;
+    return () => {
+        n = (n * 1103515245 + 12345) & 0x7fffffff;
+        return n / 0x7fffffff;
+    };
+}
 
 /**
  * La tranche de matrice affichée en haut de l'accueil.
  *
  * Structure réelle du référentiel : les tactiques dans leur ordre, et sous
- * chacune ses vraies techniques. Rien n'est inventé — c'est ce qui la rend
- * reconnaissable au premier coup d'œil par qui connaît ATT&CK.
+ * chacune ses vraies techniques. Rien n'est inventé, et c'est ce qui la rend
+ * reconnaissable au premier coup d'oeil par qui connaît ATT&CK. Seules les
+ * couleurs sont un exemple : elles montrent ce que l'outil produit à quelqu'un
+ * qui n'a encore rien évalué.
  *
  * Hors de l'arbre d'accessibilité : une lecture vocale y débiterait cent noms de
  * techniques sans qu'aucun n'apprenne quoi que ce soit. Ce que la matrice dit,
@@ -332,19 +350,161 @@ export function heroMatrix(data) {
         ? tactics.slice(debut, fin + 1)
         : tactics.slice(0, 7);
 
-    const colonnes = tranche.map(tactic => {
+    const dé = suite(20260901);
+
+    // Le rang de la colonne pilote son retard à l'arrivée : les colonnes se
+    // posent de gauche à droite, dans l'ordre où se lit une matrice ATT&CK. Le
+    // CSS fait le calcul, le markup ne porte que le rang.
+    const colonnes = tranche.map((tactic, rang) => {
         const techniques = (data.byTactic?.get(tactic.shortname) ?? []).slice(0, HERO.lignes);
-        const cases = techniques
-            .map(tech => `<span class="hm-cell">${esc(tech.name)}</span>`)
-            .join("");
-        return `<div class="hm-col">
+        const cases = techniques.map(tech => {
+            const niveau = dé() < HERO.partVides ? "vide" : `l${Math.floor(dé() * 5)}`;
+            return `<span class="hm-cell ${niveau}">${esc(tech.name)}</span>`;
+        }).join("");
+        return `<div class="hm-col" style="--col:${rang}">
                     <span class="hm-head">${esc(tactic.name)}</span>
                     ${cases}
                 </div>`;
     }).join("");
 
+    // Le tracé vit dans son propre calque, au-dessus des cases et sans les
+    // toucher : le markup de la matrice ne sait rien de l'animation, et une
+    // matrice sans JavaScript reste une matrice.
     return `
         <div class="hero-matrix" aria-hidden="true">
-            <div class="hm-grid">${colonnes}</div>
+            <div class="hm-grid">
+                ${colonnes}
+                <svg class="hm-trace" preserveAspectRatio="none" focusable="false">
+                    <path class="hm-path" fill="none"/>
+                </svg>
+            </div>
         </div>`;
+}
+
+/* ------------------------------------------------- le tracé d'un enchaînement
+
+   Toutes les 2,7 s, un chemin d'attaque se dessine sur la matrice : une case par
+   tactique, de gauche à droite, bordure allumée et trait tiré de l'une à
+   l'autre.
+
+   Ce que ça raconte, et pourquoi ça vaut une animation. Une matrice ATT&CK n'est
+   pas une grille de scores, c'est une chronologie : un attaquant entre par une
+   colonne de gauche et progresse vers la droite, une technique à la fois. Une
+   image fixe ne dit pas ce sens de lecture ; le trait, lui, le dit sans une
+   ligne de texte. C'est aussi la maquette de ce que fera la recherche par CVE,
+   où le chemin ne sera plus tiré au sort mais lu dans la vulnérabilité.
+
+   Un chemin par tactique traversée, jamais deux cases dans la même colonne :
+   c'est ainsi que se lit la matrice, et un trait qui reviendrait en arrière
+   raconterait quelque chose de faux.
+*/
+
+const TRACE = {
+    intervalle: 2700,    // temps entre deux chemins
+    dessin: 950,         // durée du trait qui se tire
+    effacement: 420,
+    minEtapes: 4,
+};
+
+/**
+ * Met la matrice de l'accueil en mouvement.
+ *
+ * @param {HTMLElement} racine l'élément qui contient `.hero-matrix`
+ * @returns {() => void} la fonction qui arrête tout et rend le DOM à son état de repos
+ */
+export function animerMatrice(racine) {
+    const grille = racine?.querySelector(".hm-grid");
+    const trace = grille?.querySelector(".hm-path");
+    if (!grille || !trace) return () => {};
+
+    const colonnes = [...grille.querySelectorAll(".hm-col")]
+        .map(col => [...col.querySelectorAll(".hm-cell")])
+        .filter(cases => cases.length > 0);
+    if (colonnes.length < TRACE.minEtapes) return () => {};
+
+    let allumees = [];
+    let minuteur = null;
+    let animation = null;
+
+    const eteindre = () => {
+        for (const c of allumees) c.classList.remove("on-path");
+        allumees = [];
+    };
+
+    /**
+     * Une case au hasard dans chaque colonne d'une suite continue partant de la
+     * première.
+     *
+     * Continue, et non piochée dans toute la largeur : une intrusion ne saute
+     * pas une phase, elle les enchaîne. Et partant de la première parce qu'elle
+     * commence toujours par un accès initial.
+     *
+     * Quatre à six colonnes, jamais les sept. Les dernières sortent de l'écran —
+     * la matrice déborde volontairement à droite — et un trait qui file vers un
+     * point qu'on ne voit pas se lit comme un défaut d'affichage, pas comme une
+     * suite. C'était le cas au premier essai.
+     */
+    const chemin = () => {
+        const maxi = Math.min(6, colonnes.length);
+        const combien = TRACE.minEtapes
+            + Math.floor(Math.random() * (maxi - TRACE.minEtapes + 1));
+        return colonnes.slice(0, combien)
+            .map(cases => cases[Math.floor(Math.random() * cases.length)]);
+    };
+
+    const jouer = () => {
+        eteindre();
+        if (animation) animation.cancel();
+
+        const cadre = grille.getBoundingClientRect();
+        if (!cadre.width || !cadre.height) return;   // page masquée : rien à dessiner
+
+        allumees = chemin();
+        const points = allumees.map(cellule => {
+            const boite = cellule.getBoundingClientRect();
+            return [
+                (boite.left + boite.width / 2 - cadre.left).toFixed(1),
+                (boite.top + boite.height / 2 - cadre.top).toFixed(1),
+            ];
+        });
+
+        // Le viewBox suit la taille réelle de la grille : les coordonnées sont
+        // en pixels, et le calque ne se déforme pas quand la fenêtre change.
+        trace.parentNode.setAttribute("viewBox", `0 0 ${cadre.width.toFixed(0)} ${cadre.height.toFixed(0)}`);
+        trace.setAttribute("d", points.map(([x, y], i) => `${i ? "L" : "M"}${x} ${y}`).join(" "));
+
+        for (const c of allumees) c.classList.add("on-path");
+
+        const longueur = trace.getTotalLength();
+        trace.style.strokeDasharray = String(longueur);
+        animation = trace.animate(
+            [{ strokeDashoffset: longueur, opacity: 1 },
+             { strokeDashoffset: 0, opacity: 1, offset: 0.55 },
+             { strokeDashoffset: 0, opacity: 1, offset: 0.82 },
+             { strokeDashoffset: 0, opacity: 0 }],
+            { duration: TRACE.dessin + TRACE.effacement + 600, easing: "ease-out", fill: "forwards" },
+        );
+
+        // Les bordures s'éteignent avec le trait, pas au chemin suivant. Sans
+        // cela, les cases restaient allumées pendant la seconde de silence entre
+        // deux chemins, et désignaient un parcours dont le trait avait disparu.
+        // La garde évite qu'une animation annulée éteigne celle qui l'a
+        // remplacée.
+        const celle = animation;
+        animation.finished
+            .then(() => { if (animation === celle) eteindre(); })
+            .catch(() => { /* annulée : le chemin suivant s'en charge */ });
+    };
+
+    // Un premier chemin tout de suite, sinon la matrice reste inerte le temps
+    // d'un intervalle et l'animation passe pour un défaut d'affichage.
+    jouer();
+    minuteur = setInterval(jouer, TRACE.intervalle);
+
+    return () => {
+        clearInterval(minuteur);
+        if (animation) animation.cancel();
+        eteindre();
+        trace.removeAttribute("d");
+    };
 }

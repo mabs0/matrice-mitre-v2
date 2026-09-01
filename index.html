@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>MAPTRIX — Maturité cyber sur MITRE ATT&amp;CK</title>
+    <title>MAPTRIX : maturité cyber sur MITRE ATT&amp;CK</title>
     <meta name="description" content="Un diagnostic structuré autour de MITRE ATT&amp;CK pour évaluer vos pratiques de sécurité, identifier vos angles morts et prioriser vos actions.">
 
     <!--
@@ -60,7 +60,7 @@
     -->
     <meta http-equiv="Content-Security-Policy" content="
         default-src 'none';
-        script-src 'strict-dynamic' 'sha256-uxt/S+gtwxhpEN9fqISjul5NApmZnTNWtTh92SsTBFY=' 'sha256-G4aUtwvfmOJcCWSxnZd2vQEyHQJl8fvItgIe/8Enm6E=' 'self' https://cdnjs.cloudflare.com;
+        script-src 'strict-dynamic' 'sha256-uxt/S+gtwxhpEN9fqISjul5NApmZnTNWtTh92SsTBFY=' 'sha256-d/fJtFq9zFmdg4165lCUZprU20TIBX8xfGTwZN3XJYg=' 'self' https://cdnjs.cloudflare.com;
         style-src 'self' 'unsafe-inline';
         img-src 'self' data: blob:;
         connect-src 'none';
@@ -68,6 +68,19 @@
         base-uri 'none';
         form-action 'none';
         object-src 'none'">
+
+    <!--
+        Le latin de Geist est demandé avant que le CSS ne soit analysé : c'est la
+        fonte de tout le texte de la page, et sans cette ligne le navigateur ne
+        la découvre qu'après avoir lu la feuille de style, donc une aller-retour
+        trop tard. Le latin étendu n'est pas préchargé : la plupart des visites
+        n'en ont aucun caractère.
+
+        `crossorigin` est obligatoire même en même origine — une fonte est
+        toujours demandée en mode CORS, et sans l'attribut le préchargement ne
+        sert à rien : le fichier serait redemandé.
+    -->
+    <link rel="preload" href="fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
 
     <link rel="stylesheet" href="css/tokens.css">
     <link rel="stylesheet" href="css/base.css">
@@ -241,7 +254,7 @@
                 "Depuis le dossier du projet, lancez un serveur local puis ouvrez "
                 + "<code>http://localhost:8000</code> :<br><code>python3 -m http.server 8000</code>"
                 + "<br><br>C'est ce que fait l'extension Live Server de VS Code, et c'est "
-                + "aussi ainsi que GitHub Pages sert le site — en ligne, rien à faire."
+                + "aussi ainsi que GitHub Pages sert le site. En ligne, rien à faire."
             );
             return;
         }
@@ -297,6 +310,14 @@
             <a class="nav-link" href="#comment">Comment ça marche</a>
             <a class="nav-link" href="#benefices">Bénéfices</a>
             <a class="nav-link" href="#faq">FAQ</a>
+
+            <!--
+                L'appel à l'action, repris dans le panneau des écrans étroits où
+                la pastille de la barre n'a plus la place d'exister. Classe
+                distincte des ancres de section : ce n'est pas une section de la
+                page, et rien de ce qui compte les quatre ne doit le compter.
+            -->
+            <a class="nav-panel-cta" href="#contact">Contactez-nous</a>
         </nav>
 
         <div id="layer-tabs"></div>
@@ -313,7 +334,23 @@
         <div class="topbar-end">
             <button class="btn btn-ghost btn-icon" id="theme-toggle" title="Basculer clair / sombre"
                     aria-label="Basculer entre le thème clair et le thème sombre">☀</button>
-            <button class="btn btn-cta" id="nav-cta">Démarrer</button>
+            <button class="btn btn-cta" id="nav-cta">Contactez-nous</button>
+
+            <!--
+                Le menu des écrans étroits. Les quatre ancres ne tiennent pas dans
+                la pastille sous ~900 px ; elles passent alors dans un panneau que
+                ce bouton déplie sous elle.
+
+                Deux barres dessinées en CSS plutôt qu'une icône : c'est le seul
+                dessin de l'interface qu'on peut faire sans fichier ni tracé, et
+                il se transforme en croix par une rotation, ce qui dit l'état
+                ouvert sans changer de symbole. `aria-expanded` porte le même
+                état pour qui n'a pas l'image.
+            -->
+            <button class="nav-toggle" id="nav-toggle" aria-expanded="false"
+                    aria-controls="site-nav" aria-label="Afficher les sections">
+                <i></i>
+            </button>
         </div>
     </header>
 

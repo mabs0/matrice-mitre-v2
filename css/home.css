@@ -16,6 +16,11 @@
 
 .home-page { display: flex; flex-direction: column; }
 
+/* Sentinelle du haut de page : un pixel, observé par main.js pour savoir si l'on
+   a quitté le repos. Elle remplace un écouteur de défilement, qui mesurait la
+   page à chaque image. */
+.home-sentinel { display: block; height: 1px; flex: none; }
+
 /* Une section pleine largeur, dont le contenu est ramené au centre. Séparer les
    deux — le fond qui va d'un bord à l'autre, le contenu qui reste dans sa
    colonne — est ce qui permet à une bande sombre de traverser la page sans que
@@ -98,7 +103,7 @@
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    padding: 6px 14px 6px 10px;
+    padding: 6px 14px 6px 11px;
     border: 1px solid var(--glass-border);
     border-radius: var(--radius-pill);
     background: var(--glass);
@@ -112,19 +117,19 @@
     overflow: hidden;
     text-overflow: ellipsis;
 }
+.hero-chip b { color: var(--text); font-variant-numeric: tabular-nums; font-weight: 600; }
+
+/* Le seul point coloré de la page, et il porte un état réel : le référentiel
+   embarqué est celui de la dernière publication. La mention qui l'accompagnait,
+   « embarqué, aucun appel réseau », disait à l'entrée d'une page publique une
+   chose d'architecture dont le lecteur ne fait rien ; elle est en FAQ, à
+   l'endroit où on se la demande. */
 .hero-chip .dot {
     width: 6px;
     height: 6px;
     border-radius: 50%;
     background: var(--good);
     flex: none;
-}
-.hero-chip b { color: var(--text); font-variant-numeric: tabular-nums; font-weight: 600; }
-.hero-chip em {
-    font-style: normal;
-    color: var(--text-mute);
-    padding-left: 8px;
-    border-left: 1px solid var(--border);
 }
 
 .hero h1 {
@@ -147,6 +152,9 @@
 }
 
 .hero-cta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: clamp(22px, 3vw, 32px); }
+
+/* Réservée aux écrans étroits ; la règle qui la montre est en bas de feuille. */
+.hero-rosace { display: none; }
 
 /* --------------------------------------------------- la matrice du haut de page
 
@@ -182,13 +190,59 @@
 }
 
 .hm-grid {
+    position: relative;      /* repère du calque de tracé */
     display: flex;
     gap: 5px;
     align-items: flex-start;
     padding: 4px 0;
 }
 
-.hm-col { display: flex; flex-direction: column; gap: 3px; flex: 0 0 108px; }
+/* Le calque du tracé : au-dessus des cases, sans jamais les toucher. Il est en
+   `absolute` sur la grille, donc hors du flux : la matrice se compose comme s'il
+   n'existait pas, et sans JavaScript il reste vide. */
+.hm-trace {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+}
+.hm-path {
+    stroke: var(--accent);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* --- le mouvement de la matrice ---
+
+   Deux gestes, deux raisons, et rien de plus.
+
+   À l'arrivée, les colonnes se posent de gauche à droite. Ce n'est pas de
+   l'ornement : c'est l'ordre dans lequel une matrice ATT&CK se lit, des accès
+   initiaux vers les accès aux identifiants, et le mouvement l'apprend en une
+   seconde et demie à quelqu'un qui ne connaît pas le référentiel. Le retard
+   vient du rang de la colonne, posé par le markup.
+
+   Au survol, la colonne visée reste nette et les autres s'effacent. C'est la
+   même lecture que dans l'outil, où une tactique sélectionnée met sa colonne en
+   avant et estompe les voisines. Le geste appris ici se retrouve là-bas. */
+.hm-col {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    flex: 0 0 108px;
+    opacity: 0;
+    transform: translateY(10px);
+    animation: hm-pose 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    animation-delay: calc(180ms + var(--col, 0) * 70ms);
+    transition: opacity 0.22s ease;
+}
+@keyframes hm-pose { to { opacity: 1; transform: none; } }
+
+.hm-grid:hover .hm-col { opacity: 0.42; }
+.hm-grid:hover .hm-col:hover { opacity: 1; }
 
 .hm-head {
     display: flex;
@@ -207,6 +261,7 @@
 }
 
 .hm-cell {
+    position: relative;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
@@ -219,6 +274,30 @@
     color: var(--text-dim);
     font-size: 0.56rem;
     line-height: 1.24;
+    transition: box-shadow 0.25s ease;
+}
+
+/* --- les niveaux ---
+
+   La même rampe que l'outil, à la même place : ce que montre l'accueil est ce
+   qu'on obtiendra. Elle est ici tempérée — la matrice du haut de page est à
+   côté du titre, pas au centre du regard, et sept colonnes en pleine saturation
+   lui feraient concurrence. Les cases sans niveau restent neutres : il reste
+   toujours des techniques qu'aucune mesure ne couvre, et c'est ce que l'outil
+   sert à voir. */
+.hm-cell.l0 { background: color-mix(in srgb, var(--lvl0) 26%, var(--surface-2)); border-color: color-mix(in srgb, var(--lvl0) 40%, var(--border)); }
+.hm-cell.l1 { background: color-mix(in srgb, var(--lvl1) 26%, var(--surface-2)); border-color: color-mix(in srgb, var(--lvl1) 40%, var(--border)); }
+.hm-cell.l2 { background: color-mix(in srgb, var(--lvl2) 30%, var(--surface-2)); border-color: color-mix(in srgb, var(--lvl2) 44%, var(--border)); }
+.hm-cell.l3 { background: color-mix(in srgb, var(--lvl3) 28%, var(--surface-2)); border-color: color-mix(in srgb, var(--lvl3) 42%, var(--border)); }
+.hm-cell.l4 { background: color-mix(in srgb, var(--lvl4) 26%, var(--surface-2)); border-color: color-mix(in srgb, var(--lvl4) 40%, var(--border)); }
+
+/* La case traversée par le chemin. Sa bordure s'allume, et rien d'autre ne
+   bouge : ni taille, ni position. Une case qui grossirait au passage du trait
+   décalerait ses voisines, et toute la colonne avec elles. */
+.hm-cell.on-path {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent), 0 2px 10px var(--accent-wash);
+    color: var(--text);
 }
 
 /* ---------------------------------------------------------------- chiffres
@@ -324,7 +403,11 @@
     gap: clamp(32px, 5vw, 80px);
     align-items: start;
 }
-.steps-intro { position: sticky; top: 108px; }
+/* L'intro reste où elle est écrite. Collée en haut, elle accompagnait le
+   parcours pendant qu'on le lisait, et c'était l'idée ; à l'usage, un bloc de
+   texte qui glisse pendant qu'on descend attire l'œil sur lui au lieu de le
+   laisser sur les étapes. */
+.steps-intro { position: static; }
 
 .home-steps {
     list-style: none;
@@ -463,15 +546,29 @@
 
 .band-faq { background: var(--surface); padding: clamp(64px, 9vw, 112px) 0; }
 
-.faq-grid {
-    display: grid;
-    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
-    gap: clamp(32px, 5vw, 80px);
-    align-items: start;
-}
-.faq-intro { position: sticky; top: 108px; }
+/* En-tête centré, questions dessous sur une seule colonne resserrée.
 
-.faq-list { display: flex; flex-direction: column; gap: 8px; }
+   La FAQ avait la mise en page du parcours : intro collée à gauche, contenu à
+   droite. Deux sections qui partagent leur silhouette ne se lisent plus comme
+   deux sujets mais comme un seul répété, et c'est le défaut de composition le
+   plus courant d'une page d'accueil. Une question se lit par ailleurs mieux sur
+   une colonne étroite et centrée : l'œil n'a pas à revenir chercher un titre
+   posé au loin. */
+.faq-grid { display: block; }
+
+.faq-intro {
+    max-width: 620px;
+    margin: 0 auto clamp(28px, 4vw, 44px);
+    text-align: center;
+}
+
+.faq-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-width: 800px;
+    margin: 0 auto;
+}
 
 .faq-item {
     border: 1px solid var(--border);
@@ -743,10 +840,51 @@
     letter-spacing: 0.08em;
 }
 
+/* ------------------------------------------- révélation des blocs au défilement
+
+   Chaque bloc se lève en entrant dans l'écran. Une seule animation sur la page,
+   et sa raison est la lecture : sur une page qu'on parcourt d'un bout à l'autre,
+   elle marque l'arrivée d'un sujet.
+
+   Pilotée par le défilement, en CSS, sans une ligne de JavaScript. La première
+   version passait par un `IntersectionObserver` qui posait l'état invisible puis
+   le retirait à l'entrée. Elle avait un défaut qu'aucune animation ne justifie :
+   quand l'observateur ne rapporte pas, l'état invisible reste, et la page est
+   blanche. C'est arrivé en banc, et une page vide est un défaut d'un tout autre
+   ordre qu'une animation manquante.
+
+   `@supports` retourne la garantie. Là où `animation-timeline` n'existe pas —
+   Safari et Firefox anciens — la règle entière est ignorée : aucun état de
+   départ n'est posé, la page s'affiche telle quelle. L'invisible n'existe donc
+   que là où le navigateur sait, de lui-même, le faire disparaître.
+
+   `animation-range` s'arrête à 24 % de la traversée : le bloc est en place bien
+   avant d'arriver au centre de l'écran, jamais en train de finir de monter
+   pendant qu'on le lit. */
+
+@supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+        [data-reveal] {
+            animation: bloc-entre linear both;
+            animation-timeline: view();
+            animation-range: entry 0% cover 24%;
+        }
+    }
+}
+
+@keyframes bloc-entre {
+    from { opacity: 0; transform: translateY(18px); }
+    to { opacity: 1; transform: none; }
+}
+
 /* ------------------------------------------------- mouvement réduit, écrans
 
    Une rosace qui se dessine n'a rien d'indispensable. */
 @media (prefers-reduced-motion: reduce) {
+    .hm-col { animation: none; opacity: 1; transform: none; transition: none; }
+    .hm-cell { transition: none; }
+    .hm-grid:hover .hm-col { opacity: 1; }
+    [data-reveal] { animation: none; opacity: 1; transform: none; }
     .ros-web-group { animation: none; }
     .ros-shape { animation: none; stroke-dashoffset: 0; fill-opacity: 0.17; }
     .ros-dot { animation: none; opacity: 1; }
@@ -769,16 +907,49 @@
     }
     .hero-matrix { margin-right: calc(-1 * max(16px, (100vw - 1112px) / 2)); }
 
-    .steps-grid, .faq-grid { grid-template-columns: minmax(0, 1fr); }
-    .steps-intro, .faq-intro { position: static; }
+    .steps-grid { grid-template-columns: minmax(0, 1fr); }
     .step:nth-child(2) { margin-left: 0; }
 }
 
+/* --------------------------------------------------------- l'accueil au doigt
+
+   Sur un téléphone, la matrice s'en va. Sept colonnes sur 400 px de large, ce
+   sont des colonnes de 50 px : les noms de techniques n'y tiennent plus, et une
+   matrice qu'on ne lit pas ne prouve rien — elle occupe juste un écran entier
+   avant qu'on arrive au bouton.
+
+   La rosace prend sa place, et c'est le bon échange : elle tient dans un carré,
+   elle dit la même chose (voici ce que l'outil vous rend), et elle se lit aussi
+   bien petite que grande puisqu'elle n'a que quinze libellés.
+
+   Le haut de page passe au centre. En colonne unique, un titre aligné à gauche
+   avec de l'air à sa droite se lit comme un bloc mal cadré ; centré, il se lit
+   comme une couverture. */
 @media (max-width: 700px) {
     .band-hero, .band-start, .band-steps, .band-benefits, .band-faq { padding-left: 0; padding-right: 0; }
     .benefits { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
     .footer-cols { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
     .hero-cta .btn, .footer-cta-actions .btn { flex: 1 1 auto; justify-content: center; }
+
+    .hero-matrix { display: none; }
+
+    .hero { padding-top: 88px; padding-bottom: 40px; gap: 0; }
+    .hero-copy { align-items: center; text-align: center; }
+    .hero-lead { margin-left: auto; margin-right: auto; }
+    .hero-cta { width: 100%; justify-content: center; }
+
+    /* L'ordre de lecture est celui du markup : pastille, titre, accroche,
+       rosace, boutons, chiffres. Rien à réordonner. */
+    .hero-rosace { display: block; width: 100%; margin: 26px 0 4px; }
+    .hero-rosace .rosace {
+        height: auto;
+        width: 100%;
+        max-width: 420px;
+        margin: 0 auto;
+    }
+
+    .home-figures { max-width: none; text-align: center; }
+    .figure { align-items: center; }
 }
 
 @media (max-width: 560px) {
@@ -791,7 +962,6 @@
     .step { padding-left: 52px; }
     .step-num { width: 38px; height: 38px; font-size: 0.72rem; }
     .step:not(:last-child)::after { left: 18px; top: 40px; }
-    .rosace { height: clamp(180px, 30vh, 260px); }
 }
 
 /* ------------------------------------------------------- champs des modales */

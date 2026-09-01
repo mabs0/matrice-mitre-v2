@@ -227,7 +227,7 @@ function paint(app) {
                 <div class="quiz-progress-bar"><div class="quiz-progress-fill" style="width:${pct}%"></div></div>
             </div>
 
-            <!-- Le rang de la question n'est plus écrit à l'écran — deux
+            <!-- Le rang de la question n'est plus écrit à l'écran : deux
                  échelles chiffrées au-dessus de la barre disaient ce qu'elle
                  montre déjà. Il reste porté ici, pour le banc d'essai et pour
                  qui inspecte la page. -->
@@ -306,9 +306,9 @@ function askTemplate(questionnaire, question, texte) {
         `  ${texte}`,
         ``,
         `Réponses possibles :`,
-        `  • Oui — la pratique est en place ;`,
-        `  • Non — elle ne l'est pas, ou pas encore ;`,
-        `  • N/A — elle ne s'applique pas à notre contexte.`,
+        `  • Oui : la pratique est en place ;`,
+        `  • Non : elle ne l'est pas, ou pas encore ;`,
+        `  • N/A : elle ne s'applique pas à notre contexte.`,
         ``,
         `Un mot de contexte ou le nom de l'outil concerné nous serait utile.`,
         `Il n'y a pas de bonne réponse attendue : l'objectif est de savoir où nous en sommes.`,
@@ -328,7 +328,7 @@ function askSomeone(app, questionnaire, question, texte) {
     // L'objet doit se comprendre seul, dans une boîte de réception : « Maturité
     // cyber — M1013 question 1 » ne dit ni de quoi il s'agit, ni ce qu'on
     // attend, ni combien de temps ça prend.
-    const sujet = `Une question sur « ${questionnaire.name} » — état des lieux sécurité`;
+    const sujet = `Une question sur « ${questionnaire.name} », état des lieux sécurité`;
 
     const panel = openModal(`
         <div class="modal-head">
@@ -376,7 +376,7 @@ function askSomeone(app, questionnaire, question, texte) {
             // certains postes d'entreprise. La sélection laisse alors la main —
             // et on ne passe pas à la suite, puisque rien n'est parti.
             panel.querySelector("#ask-body").select();
-            toast("Copie refusée par le navigateur — le texte est sélectionné.", "error");
+            toast("Copie refusée par le navigateur : le texte est sélectionné.", "error");
         }
     };
     lien.onclick = () => metEnAttente(app, questionnaire);
@@ -396,7 +396,7 @@ function metEnAttente(app, questionnaire) {
 
     const target = prochaineCible(app.layer);
     if (!target) {
-        toast(`${questionnaire.id} en attente — plus rien d'autre à traiter pour le moment.`);
+        toast(`${questionnaire.id} en attente, plus rien d'autre à traiter pour le moment.`);
         app.show("matrix");
         return;
     }
@@ -576,7 +576,7 @@ function paintResult(app, questionnaire, level) {
                 <p class="result-text" style="font-size:0.78rem;color:var(--text-mute);">
                     ${state.answered} question${state.answered > 1 ? "s" : ""} répondue${state.answered > 1 ? "s" : ""}
                     sur ${questionnaire.questions.length}${state.complete && state.answered < questionnaire.questions.length && !cursor.stoppedBy
-                        ? " — le parcours s'est arrêté sur un « Non »" : ""}
+                        ? ", le parcours s'est arrêté sur un « Non »" : ""}
                     ${skipped ? `· ${skipped} déjà répondue${skipped > 1 ? "s" : ""} depuis une autre mitigation` : ""}
                     · ${global.completeMitigations}/${global.mitigations} mitigation${global.mitigations > 1 ? "s" : ""} traitée${global.completeMitigations > 1 ? "s" : ""}
                 </p>
@@ -637,7 +637,7 @@ function paintPause(app, global, target) {
                 <h2 class="quiz-title">Toujours là ?</h2>
                 <p class="result-text">
                     ${global.completeMitigations} mitigations sur ${global.mitigations} sont traitées.
-                    La matrice s'est colorée d'autant — c'est le moment d'aller voir, ou de continuer
+                    La matrice s'est colorée d'autant. C'est le moment d'aller voir, ou de continuer
                     sur votre lancée.
                 </p>
                 <div class="pause-actions">

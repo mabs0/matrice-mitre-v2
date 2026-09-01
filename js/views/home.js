@@ -19,7 +19,7 @@
 import { esc, $, $$, toast, openModal, closeModal } from "../ui.js";
 import { createLayer, nextTarget, progress } from "../layer.js";
 import { readLayerFile, isEncrypted } from "../io.js";
-import { heroMatrix } from "./home-visuals.js";
+import { heroMatrix, rosace, animerMatrice } from "./home-visuals.js";
 
 /* Les deux entrées portaient un losange plein et un losange vide. Côte à côte,
    ces deux états d'un même signe se lisent comme « sélectionné » et « non
@@ -129,6 +129,10 @@ const BENEFICES = [
     },
 ];
 
+/* Adresse de contact, écrite une fois. Le pied de page et la pastille de la
+   barre haute y mènent tous les deux : elle ne doit exister qu'ici. */
+const CONTACT = "contact@maptrix.fr";
+
 /* --------------------------------------------------------------------- FAQ
 
    Les questions réellement posées avant de commencer, et rien d'autre. Chaque
@@ -140,7 +144,7 @@ const faq = data => [
         q: "Mes réponses partent-elles quelque part ?",
         r: `Non. Il n'y a ni serveur, ni base de données, ni compte : tout se passe dans
             l'onglet, et la page ne fait aucune requête réseau. Fermer l'onglet efface
-            l'évaluation — seul l'export en garde une trace, dans un fichier qui reste chez vous.`,
+            l'évaluation. Seul l'export en garde une trace, dans un fichier qui reste chez vous.`,
     },
     {
         q: "Sur quoi repose la note ?",
@@ -156,8 +160,8 @@ const faq = data => [
     },
     {
         q: "Puis-je m'arrêter et reprendre plus tard ?",
-        r: `Oui, par le fichier. L'export produit un JSON — chiffrable par mot de passe, en
-            AES-256-GCM — ou un classeur Excel. Réimporté, il reprend à la première question
+        r: `Oui, par le fichier. L'export produit un JSON (chiffrable par mot de passe, en
+            AES-256-GCM) ou un classeur Excel. Réimporté, il reprend à la première question
             sans réponse, ou va droit à la matrice si tout est renseigné.`,
     },
     {
@@ -170,7 +174,7 @@ const faq = data => [
         q: "Est-ce que cela remplace un audit ?",
         r: `Non. C'est un auto-diagnostic déclaratif : il vaut ce que valent les réponses
             qu'on lui donne. Il sert à cadrer une discussion, à repérer les angles morts et
-            à prioriser — pas à attester d'un niveau de sécurité.`,
+            à prioriser, pas à attester d'un niveau de sécurité.`,
     },
 ];
 
@@ -179,6 +183,7 @@ export function renderHome(app) {
 
     $("#view-home").innerHTML = `
         <div class="home-page">
+            <span class="home-sentinel" aria-hidden="true"></span>
             ${heroSection(data)}
             ${startSection()}
             ${stepsSection(data)}
@@ -221,6 +226,24 @@ export function renderHome(app) {
     });
 
     suivreLePointeur();
+
+    // Le chemin d'attaque se rejoue tant que l'accueil est à l'écran. Un rendu
+    // remplace le DOM : la boucle précédente pointerait sur des noeuds détachés
+    // et tournerait pour rien jusqu'à la fin de la session.
+    arreterVisuels();
+    if (!globalThis.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) {
+        arretMatrice = animerMatrice($("#view-home"));
+    }
+}
+
+/* La boucle du tracé, arrêtée quand on quitte l'accueil : un minuteur qui
+   continue de mesurer des cases invisibles est un minuteur qui coûte sans
+   rendre. `main.js` l'appelle au changement de vue. */
+let arretMatrice = null;
+
+export function arreterVisuels() {
+    if (arretMatrice) arretMatrice();
+    arretMatrice = null;
 }
 
 /* ---------------------------------------------------------------- sections */
@@ -240,9 +263,8 @@ function heroSection(data) {
             <div class="wrap hero">
                 <div class="hero-copy">
                     <span class="hero-chip" id="version-badge">
-                        <i class="dot"></i>
+                        <i class="dot" aria-hidden="true"></i>
                         <span id="version-text">ATT&amp;CK Enterprise <b>v${esc(data.version)}</b></span>
-                        <em>embarqué, aucun appel réseau</em>
                     </span>
 
                     <h1>Évaluez la <em>maturité cyber</em> de votre organisation</h1>
@@ -251,6 +273,15 @@ function heroSection(data) {
                         Un diagnostic structuré autour de MITRE ATT&amp;CK® pour évaluer vos pratiques
                         de sécurité, identifier vos angles morts et prioriser vos actions.
                     </p>
+
+                    <!--
+                        La rosace n'apparaît que sur les écrans étroits, où la
+                        matrice est retirée : sept colonnes sur 400 px ne se
+                        lisent pas, et une matrice qu'on ne lit pas ne prouve
+                        rien. La rosace, elle, tient dans un carré et dit la
+                        même chose — voici ce que l'outil vous rend.
+                    -->
+                    <div class="hero-rosace">${rosace(data)}</div>
 
                     <div class="hero-cta">
                         <button class="btn btn-primary btn-lg" data-action="new-layer">Démarrer l'évaluation</button>
@@ -274,14 +305,14 @@ function startSection() {
     return `
         <section class="band band-start" id="demarrer">
             <div class="wrap">
-                <header class="band-head">
+                <header class="band-head" data-reveal>
                     <span class="eyebrow">Démarrer</span>
                     <h2>Deux façons d'entrer</h2>
                     <p>Une évaluation neuve, ou la reprise d'une évaluation déjà commencée.</p>
                 </header>
 
                 <div class="home-actions">
-                    <div class="action-card spotlight">
+                    <div class="action-card spotlight" data-reveal>
                         <span class="glyph">${GLYPH_NEW}</span>
                         <h3>Nouveau layer</h3>
                         <p>
@@ -291,7 +322,7 @@ function startSection() {
                         <button class="btn btn-primary" id="home-new" data-action="new-layer">Créer un layer</button>
                     </div>
 
-                    <div class="action-card spotlight">
+                    <div class="action-card spotlight" data-reveal>
                         <span class="glyph">${GLYPH_OPEN}</span>
                         <h3>Ouvrir un layer existant</h3>
                         <p>
@@ -330,7 +361,7 @@ function stepsSection(data) {
     ];
 
     const items = etapes.map((etape, i) => `
-        <li class="step">
+        <li class="step" data-reveal style="--i:${i}">
             <span class="step-num">${String(i + 1).padStart(2, "0")}</span>
             <h3>${etape.titre}</h3>
             <p>${etape.texte}</p>
@@ -339,7 +370,7 @@ function stepsSection(data) {
     return `
         <section class="band band-steps" id="comment">
             <div class="wrap steps-grid">
-                <div class="steps-intro">
+                <div class="steps-intro" data-reveal>
                     <span class="eyebrow">Comment ça marche</span>
                     <h2>De l'évaluation à la cartographie</h2>
                     <p>Un parcours en trois étapes pour mesurer votre maturité et visualiser
@@ -351,8 +382,8 @@ function stepsSection(data) {
 }
 
 function benefitsSection() {
-    const cartes = BENEFICES.map(b => `
-        <article class="benefit-card spotlight">
+    const cartes = BENEFICES.map((b, i) => `
+        <article class="benefit-card spotlight" data-reveal style="--i:${i}">
             <span class="benefit-visual">${b.vignette}</span>
             <h3>${b.titre}</h3>
             <p>${b.texte}</p>
@@ -361,7 +392,7 @@ function benefitsSection() {
     return `
         <section class="band band-benefits" id="benefices">
             <div class="wrap">
-                <header class="band-head">
+                <header class="band-head" data-reveal>
                     <span class="eyebrow">Bénéfices</span>
                     <h2>Ce que <em>MAPTRIX</em> vous apporte</h2>
                     <p>Transformez votre évaluation de maturité en une vision claire de votre
@@ -385,7 +416,7 @@ function faqSection(data) {
     return `
         <section class="band band-faq" id="faq">
             <div class="wrap faq-grid">
-                <div class="faq-intro">
+                <div class="faq-intro" data-reveal>
                     <span class="eyebrow">FAQ</span>
                     <h2>Questions fréquentes</h2>
                     <p>Ce qu'on demande le plus souvent avant de commencer.</p>
@@ -400,9 +431,9 @@ function faqSection(data) {
    les deux seuls qui existent — le référentiel et le dépôt. */
 function footerSection() {
     return `
-        <footer class="site-footer">
+        <footer class="site-footer" id="contact">
             <div class="wrap">
-                <div class="footer-cta">
+                <div class="footer-cta" data-reveal>
                     <h2>Prêt à cartographier votre couverture ?</h2>
                     <p>Aucun compte, aucune installation : le questionnaire démarre au clic.</p>
                     <div class="footer-cta-actions">
@@ -433,10 +464,9 @@ function footerSection() {
                         <a href="#benefices">Bénéfices</a>
                     </nav>
 
-                    <nav class="footer-col" aria-label="Projet">
-                        <h4>Projet</h4>
-                        <a href="https://github.com/mabs0/matrice-mitre-v2" target="_blank" rel="noopener noreferrer">Code source</a>
-                        <a href="https://github.com/mabs0/matrice-mitre-v2/issues" target="_blank" rel="noopener noreferrer">Signaler un problème</a>
+                    <nav class="footer-col" aria-label="Société">
+                        <h4>Société</h4>
+                        <a href="mailto:${esc(CONTACT)}">Contactez-nous</a>
                     </nav>
                 </div>
 
@@ -517,18 +547,18 @@ async function importFile(app, file) {
         const next = nextTarget(layer);
 
         if (!next) {
-            toast(`« ${layer.name} » importé — questionnaire complet.`);
+            toast(`« ${layer.name} » importé, questionnaire complet.`);
             app.show("matrix");
             return;
         }
 
         layer.cursor = next;
-        toast(`« ${layer.name} » importé — ${state.completeMitigations}/${state.mitigations} mitigations traitées, reprise en cours.`);
+        toast(`« ${layer.name} » importé : ${state.completeMitigations}/${state.mitigations} mitigations traitées, reprise en cours.`);
         app.show("quiz");
     } catch (err) {
         // Les messages sont déjà écrits pour être lus tels quels : le détail
         // technique part en console, côté io.js et excel.js.
-        toast(`Import impossible — ${err.message}.`, "error");
+        toast(`Import impossible : ${err.message}.`, "error");
     }
 }
 

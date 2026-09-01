@@ -6,6 +6,14 @@
 # ailleurs, et absente pour qui reprendrait le dépôt.
 .claude/
 
+# Skills installées par `npx skills add` : le dossier réel, et le verrou qui dit
+# d'où elles viennent. Même raison que ci-dessus, plus une qui lui est propre —
+# le workflow Pages publie le dépôt entier (`path: .`) et `.nojekyll` lève le
+# filtrage des dossiers commençant par un point. Suivies, ces 380 Ko de consignes
+# d'agent se retrouveraient donc servies sur le site public.
+.agents/
+skills-lock.json
+
 # Documents de travail internes (roadmap DIFFUSION RESTREINTE, relecture CLUSIF nominative, sources Excel/Word/PowerPoint)
 docs/
 

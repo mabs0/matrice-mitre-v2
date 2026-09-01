@@ -154,7 +154,7 @@ function habillerSyntheses(ws, syntheses) {
             cellule.fill = remplir(RAMPE[note]);
             cellule.font = { bold: true, size: 11, color: { argb: ENCRE[note] } };
         } else {
-            cellule.value = "—";
+            cellule.value = "-";
             cellule.font = { bold: true, size: 10, color: { argb: GRIS } };
         }
         cellule.alignment = { horizontal: "center", vertical: "middle" };
@@ -303,7 +303,7 @@ function feuilleReponses(wb, layer, levels) {
         const note = levels?.has(id) ? levels.get(id) : "";
         const ligne = ws.addRow({
             id,
-            question: `${questionnaire.name} — ${questionnaire.questions.length} question`
+            question: `${questionnaire.name} : ${questionnaire.questions.length} question`
                 + `${questionnaire.questions.length > 1 ? "s" : ""}`,
             date: dates.sort().at(-1) ?? "",
             note,
@@ -516,7 +516,7 @@ function legende(ws, ligne) {
     const paliers = ws.getRow(ligne + 1);
     for (let n = 0; n <= 4; n++) {
         const c = paliers.getCell(n + 1);
-        c.value = `${n} — ${LEVEL_LABELS[n]}`;
+        c.value = `${n} - ${LEVEL_LABELS[n]}`;
         c.fill = remplir(RAMPE[n]);
         c.font = { size: 9, color: { argb: ENCRE[n] } };
         c.alignment = { horizontal: "center" };
@@ -712,7 +712,7 @@ export function loadExcel() {
             : reject(new Error("bibliothèque Excel chargée mais introuvable"));
         s.onerror = () => {
             chargement = null;
-            reject(new Error("bibliothèque Excel inaccessible — vérifiez la connexion"));
+            reject(new Error("bibliothèque Excel inaccessible, vérifiez la connexion"));
         };
         document.head.appendChild(s);
     });

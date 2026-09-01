@@ -62,7 +62,7 @@ function subtle() {
     const api = globalThis.crypto?.subtle;
     if (!api) {
         throw new Error(
-            "le chiffrement demande une origine sécurisée — ouvrez la page en https, "
+            "le chiffrement demande une origine sécurisée. Ouvrez la page en https, "
             + "ou en http://localhost"
         );
     }

@@ -107,6 +107,6 @@ export function construire(data) {
  * @param {(msg: string, ratio?: number) => void} onProgress
  */
 export async function loadAttack(onProgress = () => {}) {
-    onProgress(`ATT&CK Enterprise v${DATA.version} — construction de la matrice…`, 1);
+    onProgress(`ATT&CK Enterprise v${DATA.version} : construction de la matrice…`, 1);
     return construire(DATA);
 }

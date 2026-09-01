@@ -1402,11 +1402,55 @@ window.document.getElementById("brand").click();
        cases.length > 0 && cases.every(c => noms.has(c.textContent.trim())),
        cases.slice(0, 3).map(c => c.textContent.trim()).join(" · "));
 
-    // Vide, parce qu'aucune évaluation n'a commencé. Les couleurs viendront
-    // quand elles voudront dire quelque chose.
-    ok("aucune case n'est colorée : c'est une matrice vierge",
-       cases.every(c => !/\bl[0-4]\b|lvl-/.test(c.className)),
-       [...new Set(cases.map(c => c.className))].join(" | "));
+    // Les cases portent un niveau de la rampe : l'accueil montre ce que l'outil
+    // produit, à quelqu'un qui n'a encore rien évalué. Tirage déterministe, pour
+    // que la matrice ne change pas de visage d'une visite à l'autre.
+    ok("chaque case porte un niveau de la rampe, ou aucun",
+       cases.every(c => /\b(l[0-4]|vide)\b/.test(c.className)),
+       [...new Set(cases.map(c => c.className.replace("hm-cell ", "")))].join(" | "));
+    // Le mini-référentiel du banc n'a que deux tactiques et cinq techniques : de
+    // quoi vérifier la mécanique, pas la distribution. On rejoue donc le tirage
+    // sur une matrice de la taille réelle, sept colonnes de quinze cases.
+    {
+        const { heroMatrix } = await import(`${APP}/js/views/home-visuals.js`);
+        const noms = ["initial-access", "execution", "persistence", "privilege-escalation",
+                      "stealth", "defense-impairment", "credential-access"];
+        const large = {
+            tactics: noms.map(shortname => ({ shortname, name: shortname })),
+            byTactic: new Map(noms.map(shortname => [shortname,
+                Array.from({ length: 15 }, (_, i) => ({ id: `T${i}`, name: `Technique ${i}` }))])),
+        };
+        const bac = window.document.createElement("div");
+        bac.innerHTML = heroMatrix(large);
+        const toutes = [...bac.querySelectorAll(".hm-cell")];
+
+        ok("les cinq paliers sont représentés",
+           [0, 1, 2, 3, 4].every(n => toutes.some(c => c.classList.contains(`l${n}`))),
+           [0, 1, 2, 3, 4].map(n => `l${n}:${toutes.filter(c => c.classList.contains(`l${n}`)).length}`).join(" "));
+        // Une matrice entièrement colorée n'a jamais existé : il reste toujours
+        // des techniques qu'aucune mesure ne couvre, et c'est ce qu'on vient voir.
+        const vides = toutes.filter(c => c.classList.contains("vide")).length;
+        ok("et il reste des techniques sans niveau",
+           vides > 0 && vides < toutes.length / 2, `${vides} sur ${toutes.length}`);
+        // Deux rendus doivent donner exactement la même matrice : tirée au hasard
+        // à chaque affichage, elle changerait de visage à chaque visite.
+        ok("le tirage est déterministe", heroMatrix(large) === heroMatrix(large));
+    }
+
+    // Le chemin d'attaque se dessine dans son propre calque : la matrice se
+    // compose comme s'il n'existait pas, et sans JavaScript elle reste entière.
+    const calque = home.querySelector(".hm-grid .hm-trace .hm-path");
+    ok("le tracé a son propre calque, vide au départ",
+       !!calque && !calque.getAttribute("d"));
+    ok("la grille sert de repère au calque",
+       /\.hm-grid\s*\{[^}]*position:\s*relative/.test(homeCss) &&
+       /\.hm-trace\s*\{[^}]*position:\s*absolute/.test(homeCss));
+    // Une case traversée change de bordure, jamais de taille : elle décalerait
+    // sa colonne entière.
+    const surChemin = /\.hm-cell\.on-path\s*\{([^}]*)\}/.exec(homeCss)?.[1] ?? "";
+    ok("la case traversée s'allume sans bouger",
+       /border-color/.test(surChemin) && !/(^|[;\s])(width|height|padding|transform|font-size)\s*:/.test(surChemin),
+       surChemin.replace(/\s+/g, " ").trim());
 
     /* --- une page, des sections, et les ancres qui y mènent --- */
 
@@ -1452,6 +1496,46 @@ window.document.getElementById("brand").click();
     ok("la version du référentiel est annoncée en haut de page",
        window.document.getElementById("version-text")?.textContent.includes(data.version),
        window.document.getElementById("version-text")?.textContent);
+
+    /* --- la barre haute ne propose qu'une fois de démarrer --- */
+
+    // Elle portait deux fois le même geste : l'ancre « Démarrer » et une pastille
+    // noire « Démarrer », à deux centimètres l'une de l'autre.
+    const cta = window.document.getElementById("nav-cta");
+    ok("la pastille de la barre ne redit pas l'ancre",
+       cta?.textContent.trim() === "Contactez-nous", cta?.textContent.trim());
+    ok("et elle mène au pied de page, qui porte le contact",
+       !!home.querySelector("#contact") &&
+       /#nav-cta[\s\S]{0,200}#contact/.test(readFileSync(`${ROOT}/js/main.js`, "utf8")));
+
+    /* --- rien ne suit le défilement --- */
+
+    // Une intro collée en haut accompagne la lecture, en théorie ; à l'usage, un
+    // bloc de texte qui glisse pendant qu'on descend attire l'oeil sur lui.
+    ok("aucun bloc de l'accueil ne suit le défilement",
+       !/position:\s*sticky/.test(homeCss));
+
+    /* --- la pastille de version --- */
+
+    const chip = home.querySelector(".hero-chip");
+    ok("elle porte un point d'état et le numéro, rien de plus",
+       !!chip?.querySelector(".dot") && /v/.test(chip.textContent) &&
+       !/appel réseau|embarqué/.test(chip.textContent),
+       chip?.textContent.replace(/\s+/g, " ").trim());
+
+    /* --- le verre de la barre --- */
+
+    const tokensCss = readFileSync(`${ROOT}/css/tokens.css`, "utf8");
+    const couches = [...tokensCss.matchAll(/--glass:\s*rgba\([^)]*?([\d.]+)\)/g)].map(m => Number(m[1]));
+    ok("le verre au repos laisse voir la page à travers",
+       couches.length >= 2 && couches.every(a => a <= 0.45), couches.join(", "));
+    const denses = [...tokensCss.matchAll(/--glass-strong:\s*rgba\([^)]*?([\d.]+)\)/g)].map(m => Number(m[1]));
+    // En défilant, la barre passe devant les cartes sombres : sur ce fond une
+    // couche légère ramène le libellé d'un lien à un gris sur gris.
+    ok("et se densifie dès qu'il y a du contenu dessous",
+       denses.length >= 2 && denses.every(a => a >= 0.8), denses.join(", "));
+    ok("le flou porte ce que l'opacité ne porte plus",
+       /backdrop-filter:\s*blur\((2[0-9]|3[0-9])px\)/.test(readFileSync(`${ROOT}/css/base.css`, "utf8")));
 
     /* --- le parcours en trois temps --- */
 
@@ -1505,6 +1589,15 @@ window.document.getElementById("brand").click();
        [...pied.querySelectorAll('.footer-col a[href^="#"]')]
            .every(a => !!home.querySelector(a.getAttribute("href"))),
        [...pied.querySelectorAll('.footer-col a[href^="#"]')].map(a => a.getAttribute("href")).join(","));
+    // Plus de lien vers le dépôt : le projet part en production, et le code
+    // source n'est pas une ressource qu'on propose à un visiteur.
+    ok("le pied de page ne renvoie pas vers le dépôt",
+       ![...pied.querySelectorAll("a")].some(a => /github\.com/.test(a.getAttribute("href") ?? "")),
+       [...pied.querySelectorAll("a")].map(a => a.getAttribute("href")).join(" "));
+    ok("il porte un point de contact",
+       !!pied.querySelector('a[href^="mailto:"]'),
+       pied.querySelector('a[href^="mailto:"]')?.getAttribute("href"));
+
     // Un lien sortant s'ouvre ailleurs, et ne laisse pas la page ouvrante
     // accessible à la page ouverte.
     ok("les liens sortants sont protégés",
@@ -1558,7 +1651,7 @@ window.document.getElementById("brand").click();
         // zone, qui la recouvre.
         ok("chaque sommet nomme sa tactique au survol",
            [...dots].map(d => (d.closest(".ros-vertex")?.querySelector("title")?.textContent ?? "")
-               .replace(/ — (niveau [0-4],\d|non évaluée)$/, ""))
+               .replace(/ : (niveau [0-4],\d|non évaluée)$/, ""))
                .join("|") === tactiques.join("|"),
            dots[0]?.closest(".ros-vertex")?.querySelector("title")?.textContent);
         ok("les sommets apparaissent l'un après l'autre",
@@ -1978,13 +2071,24 @@ console.log("\n[30] Tenue sur écran étroit");
     const base = sheets.find(([n]) => n === "base")[1];
     const narrow = /@media\s*\(max-width:\s*560px\)\s*\{([\s\S]*)\n\}/.exec(base)?.[1] ?? "";
     // Le numéro de version a quitté la barre pour le haut de page, où il est
-    // adossé à la promesse au lieu de flotter sans contexte. Ce qui doit céder
-    // sur un écran étroit, ce sont les quatre ancres : elles ne tiennent pas
-    // dans la pastille, et la page se parcourt de toute façon au défilement.
+    // adossé à la promesse au lieu de flotter sans contexte. Sous 900 px, les
+    // quatre ancres ne tiennent plus dans la pastille : elles passent dans un
+    // panneau replié, et non aux oubliettes. Une page unique dont on ne peut
+    // atteindre les sections qu'au défilement perd la moitié de sa navigation.
     const sousNeufCents = /@media\s*\(max-width:\s*900px\)\s*\{([\s\S]*?)\n\}/.exec(base)?.[1] ?? "";
-    ok("la barre haute est allégée : les ancres s'effacent",
-       /#topbar\[data-mode="home"\] #site-nav\s*\{\s*display:\s*none/.test(sousNeufCents),
+    ok("sous 900 px, un bouton remplace les ancres dans la barre",
+       /\.nav-toggle\s*\{\s*display:\s*inline-grid/.test(sousNeufCents),
        sousNeufCents.replace(/\s+/g, " ").slice(0, 120));
+    ok("et les ancres passent dans un panneau, jamais supprimées",
+       /#topbar\[data-mode="home"\] #site-nav\s*\{[^}]*position:\s*absolute/.test(sousNeufCents) &&
+       /#site-nav\.open\s*\{\s*display:\s*flex/.test(sousNeufCents));
+    // Un lien de 20 px de haut ne s'attrape pas au doigt.
+    ok("les liens du panneau ont la hauteur du doigt",
+       /#topbar\[data-mode="home"\] \.nav-link\s*\{[^}]*min-height:\s*44px/.test(sousNeufCents));
+    // Le bouton et la liste disent le même état, à deux publics.
+    ok("l'état du menu est annoncé, pas seulement dessiné",
+       /aria-expanded="false"/.test(readFileSync(`${ROOT}/index.html`, "utf8")) &&
+       /setAttribute\("aria-expanded"/.test(readFileSync(`${ROOT}/js/main.js`, "utf8")));
     ok("et la pastille se resserre sur un téléphone",
        /#topbar\[data-mode="home"\]\s*\{[^}]*height:\s*52px/.test(narrow),
        narrow.replace(/\s+/g, " ").slice(0, 120));
@@ -2020,18 +2124,36 @@ console.log("\n[30] Tenue sur écran étroit");
     /* --- ce qu'on ne montre pas, ou autrement, sur un petit écran --- */
 
     const homeCss = sheets.find(([n]) => n === "home")[1];
-    // La matrice du haut de page n'est jamais masquée : c'est elle qui montre ce
-    // que fait l'outil, et c'est sur un petit écran qu'on a le moins de patience
-    // pour lire à sa place. Elle passe sous la promesse au lieu d'être à côté.
-    ok("la matrice du haut de page reste affichée sur un téléphone",
-       !/\.hero-matrix\s*\{\s*display:\s*none/.test(homeCss));
+    // Sur un téléphone, la matrice s'en va et la rosace prend sa place. Sept
+    // colonnes sur 400 px font des colonnes de 50 px : les noms de techniques
+    // n'y tiennent plus, et une matrice qu'on ne lit pas occupe un écran entier
+    // avant qu'on arrive au bouton. La rosace dit la même chose dans un carré.
+    const petitEcran = /@media\s*\(max-width:\s*700px\)\s*\{([\s\S]*?)\n\}/.exec(homeCss)?.[1] ?? "";
+    ok("sur un téléphone, la matrice cède la place",
+       /\.hero-matrix\s*\{\s*display:\s*none/.test(petitEcran));
+    ok("et la rosace la remplace, sur toute la largeur",
+       /\.hero-rosace\s*\{\s*display:\s*block[^}]*\}/.test(petitEcran) &&
+       /\.hero-rosace \.rosace\s*\{[^}]*width:\s*100%/.test(petitEcran));
+    ok("elle n'existe que là : ailleurs, c'est la matrice qui parle",
+       /^\.hero-rosace\s*\{\s*display:\s*none/m.test(homeCss));
+    ok("le haut de page se recentre",
+       /\.hero-copy\s*\{[^}]*text-align:\s*center/.test(petitEcran));
+    // Elle est bien rendue, pas seulement prévue par le CSS.
+    ok("la rosace est présente dans le markup de l'accueil",
+       !!home.querySelector(".hero-rosace .rosace"));
     ok("le haut de page passe sur une colonne quand la place manque",
        /@media\s*\(max-width:\s*1000px\)\s*\{[\s\S]*?\.hero\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/.test(homeCss));
-    // Les deux colonnes de texte du parcours et de la FAQ ne tiennent pas non
-    // plus : leur intro cesse d'être collée en haut, sinon elle occupe l'écran.
-    ok("le parcours et la FAQ repassent sur une colonne",
-       /@media\s*\(max-width:\s*1000px\)\s*\{[\s\S]*?\.steps-grid, \.faq-grid\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/.test(homeCss) &&
-       /\.steps-intro, \.faq-intro\s*\{[^}]*position:\s*static/.test(homeCss));
+    // Les deux colonnes du parcours ne tiennent pas non plus : son intro cesse
+    // d'être collée en haut, sinon elle occupe l'écran à elle seule.
+    ok("le parcours repasse sur une colonne",
+       /@media\s*\(max-width:\s*1000px\)\s*\{[\s\S]*?\.steps-grid\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/.test(homeCss) &&
+       /\.steps-intro\s*\{[^}]*position:\s*static/.test(homeCss));
+    // La FAQ, elle, n'a plus de deux colonnes à défaire : elle est centrée sur
+    // une colonne à toutes les largeurs, pour ne pas redire la silhouette du
+    // parcours deux sections plus haut.
+    ok("la FAQ ne reprend pas la silhouette du parcours",
+       /\.faq-grid\s*\{\s*display:\s*block/.test(homeCss) &&
+       !/\.faq-grid\s*\{[^}]*grid-template-columns/.test(homeCss));
     // Les chiffres ont perdu leur grille cloisonnée : trois nombres posés, sans
     // cadre. Sur écran étroit ils gardent une seule ligne — trois colonnes
     // explicites, donc jamais de trou en fin de ligne à reboucher.
@@ -2294,15 +2416,15 @@ console.log("\n[32] Mise en forme du classeur");
         ok("un bloc de questions est clos par une ligne de synthèse",
            bloc.length === QST.size, `${bloc.length} synthèses pour ${QST.size} mitigations`);
         ok("elle nomme la mitigation et compte ses questions",
-           bloc.every(b => / — \d+ questions?$/.test(b.libelle)),
-           bloc.find(b => !/ — \d+ questions?$/.test(b.libelle))?.libelle ?? bloc[0]?.libelle);
+           bloc.every(b => / : \d+ questions?$/.test(b.libelle)),
+           bloc.find(b => !/ : \d+ questions?$/.test(b.libelle))?.libelle ?? bloc[0]?.libelle);
         ok("elle porte la note, peinte au palier atteint",
            bloc.filter(b => Number.isInteger(b.note)).every(b => b.fondNote === RAMPE[b.note]),
            bloc.filter(b => Number.isInteger(b.note)).slice(0, 3)
                .map(b => `${b.note}->${b.fondNote}`).join(" "));
         // Une mitigation non évaluée ne doit pas passer pour un niveau 0.
         ok("une mitigation non évaluée affiche un tiret, pas un zéro",
-           bloc.filter(b => !Number.isInteger(b.note)).every(b => b.note === "—"),
+           bloc.filter(b => !Number.isInteger(b.note)).every(b => b.note === "-"),
            [...new Set(bloc.filter(b => !Number.isInteger(b.note)).map(b => String(b.note)))].join(","));
 
         // Le défaut trouvé en chemin : dans une comparaison numérique, Excel
@@ -2782,7 +2904,7 @@ console.log("\n[35c] Le tableau de bord");
            bac.querySelectorAll(".ros-dot.vide").length === donnees.tactics.length,
            `${bac.querySelectorAll(".ros-dot.vide").length} creux sur ${donnees.tactics.length}`);
         ok("et la moyenne ne s'invente pas de valeur",
-           bac.querySelector(".ros-value")?.textContent === "—",
+           bac.querySelector(".ros-value")?.textContent === "-",
            bac.querySelector(".ros-value")?.textContent);
     }
 
@@ -3162,6 +3284,128 @@ console.log("\n[39] Une adresse venue du bundle n'entre dans un lien qu'après c
        /href="\$\{esc\(lienWeb\(tech\.url\)\)\}"/.test(src) &&
        /\^https\?:/.test(src),
        /href="\$\{esc\(tech\.url\)\}"/.test(src) ? "posée sans contrôle" : "");
+}
+
+console.log("\n[41] Le mouvement, et ce qui le coupe");
+{
+    const homeCss = readFileSync(`${ROOT}/css/home.css`, "utf8");
+    const home = window.document.getElementById("view-home");
+
+    /* Aucun écouteur de défilement dans le projet. Il se déclenche à chaque
+       image, et celui qu'on avait mesurait quatre sections à chaque fois : autant
+       de recalculs de mise en page forcés pendant le geste le plus sensible de la
+       page. Deux mécaniques le remplacent, `IntersectionObserver` pour les
+       marques d'état, une chronologie de défilement CSS pour l'animation. */
+    const modules = [...readdirSync(`${ROOT}/js`).filter(f => f.endsWith(".js")).map(f => `js/${f}`),
+                     ...readdirSync(`${ROOT}/js/views`).map(f => `js/views/${f}`)];
+    const ecouteurs = modules.filter(f =>
+        /addEventListener\(\s*["']scroll["']/.test(readFileSync(`${ROOT}/${f}`, "utf8")));
+    ok("aucun écouteur de défilement", ecouteurs.length === 0, ecouteurs.join(", "));
+
+    /* L'animation de révélation ne pose son état invisible que là où le
+       navigateur sait, de lui-même, le faire disparaître. Sans le `@supports`,
+       un navigateur qui ignore `animation-timeline` afficherait une page dont
+       tous les blocs sont à zéro d'opacité, et rien ne l'en sortirait. */
+    ok("la révélation est pilotée par le défilement, en CSS",
+       /animation-timeline:\s*view\(\)/.test(homeCss));
+    const garde = /@supports \(animation-timeline: view\(\)\) \{([\s\S]*?)\n\}/.exec(homeCss)?.[1] ?? "";
+    // Hors du bloc gardé, il ne doit rien rester : une seule déclaration ailleurs
+    // suffirait à cacher la page sur un navigateur qui ignore la propriété.
+    const horsGarde = homeCss
+        .replace(/\/\*[\s\S]*?\*\//g, "")          // les commentaires en parlent, ils ne règlent rien
+        .replace(/@supports \(animation-timeline: view\(\)\) \{[\s\S]*?\n\}/, "");
+    ok("et son état de départ est enfermé dans un @supports",
+       /animation-timeline:\s*view\(\)/.test(garde) && !/animation-timeline/.test(horsGarde),
+       garde.replace(/\s+/g, " ").slice(0, 90));
+    ok("les blocs à révéler sont marqués dans le markup",
+       home.querySelectorAll("[data-reveal]").length >= 6,
+       String(home.querySelectorAll("[data-reveal]").length));
+
+    /* La matrice se pose colonne par colonne, dans l'ordre où elle se lit. Le
+       rang vient du markup, le retard se calcule en CSS : la géométrie n'est
+       écrite qu'à un seul endroit. */
+    const rangs = [...home.querySelectorAll(".hm-col")].map(c => c.style.getPropertyValue("--col"));
+    ok("chaque colonne porte son rang, dans l'ordre de lecture",
+       rangs.length > 0 && rangs.every((r, i) => r === String(i)), rangs.join(","));
+    ok("le retard se calcule à partir du rang, sans le redire",
+       /animation-delay:\s*calc\([^)]*var\(--col/.test(homeCss));
+
+    /* Une animation qu'on ne peut pas couper est une animation de trop. */
+    const sobre = /@media \(prefers-reduced-motion: reduce\)\s*\{([\s\S]*?)\n\}/.exec(homeCss)?.[1] ?? "";
+    for (const [quoi, motif] of [
+        ["la pose de la matrice", /\.hm-col[^}]*animation:\s*none/],
+        ["l'estompage au survol", /\.hm-grid:hover \.hm-col[^}]*opacity:\s*1/],
+        ["la révélation des blocs", /\[data-reveal\][^}]*animation:\s*none/],
+        ["le tracé de la rosace", /\.ros-shape[^}]*animation:\s*none/],
+    ]) {
+        ok(`en mouvement réduit, ${quoi} se coupe`, motif.test(sobre));
+    }
+}
+
+console.log("\n[40] Aucun tiret cadratin dans ce que l'utilisateur lit");
+{
+    /* Décision de cadrage, pas de goût : le tiret cadratin est banni des chaînes
+       affichées. C'est la ponctuation que les modèles de langue posent partout,
+       et une interface qui en est constellée se lit comme une interface écrite
+       par une machine. Les commentaires du code la gardent : personne ne les
+       lit dans un navigateur, et c'est la voix dans laquelle ce dépôt est écrit.
+
+       La règle ne vaut donc que si on peut la vérifier sans exception à discuter.
+       D'où ce test, qui retire les commentaires puis ne tolère plus un seul
+       caractère. Sans lui, la règle serait revenue au premier texte ajouté. */
+
+    /** Retire commentaires de bloc et de ligne sans toucher au contenu des chaînes. */
+    const sansCommentaires = src => {
+        let out = "", i = 0, etat = null;
+        while (i < src.length) {
+            const c = src[i], suivant = src[i + 1] ?? "";
+            if (etat === null) {
+                if (c === "/" && suivant === "*") { etat = "bloc"; i += 2; continue; }
+                if (c === "/" && suivant === "/") { etat = "ligne"; i += 2; continue; }
+                if (c === '"' || c === "'" || c === "`") etat = c;
+                out += c; i += 1; continue;
+            }
+            if (etat === "bloc") {
+                if (c === "*" && suivant === "/") { etat = null; i += 2; continue; }
+                out += c === "\n" ? "\n" : " "; i += 1; continue;
+            }
+            if (etat === "ligne") {
+                if (c === "\n") { etat = null; out += "\n"; }
+                i += 1; continue;
+            }
+            if (c === "\\") { out += c + suivant; i += 2; continue; }
+            if (c === etat) etat = null;
+            out += c; i += 1;
+        }
+        return out;
+    };
+
+    // `attack-data.js` est hors de portée, et c'est la seule exception : ce sont
+    // les descriptions de MITRE, recopiées telles quelles. Les réécrire pour
+    // notre confort typographique reviendrait à falsifier la source citée.
+    const fichiers = ["index.html",
+        ...readdirSync(`${ROOT}/js`).filter(f => f.endsWith(".js") && f !== "attack-data.js")
+            .map(f => `js/${f}`),
+        ...readdirSync(`${ROOT}/js/views`).map(f => `js/views/${f}`)];
+
+    const coupables = [];
+    for (const fichier of fichiers) {
+        let src = readFileSync(`${ROOT}/${fichier}`, "utf8");
+        // Les commentaires de markup partent en premier : ils vivent à
+        // l'intérieur de gabarits, donc le découpage JavaScript ne les voit pas.
+        src = src.replace(/<!--[\s\S]*?-->/g, " ");
+        for (const [i, ligne] of sansCommentaires(src).split("\n").entries()) {
+            if (/[—–]/.test(ligne)) coupables.push(`${fichier}:${i + 1}`);
+        }
+    }
+    ok("aucun tiret cadratin ni demi-cadratin dans une chaîne affichée",
+       coupables.length === 0, coupables.slice(0, 8).join(", "));
+
+    // Les commentaires, eux, en gardent : la règle vise ce qui s'affiche, et
+    // l'inverse voudrait dire réécrire la documentation du dépôt pour une raison
+    // qui ne la concerne pas.
+    ok("les commentaires du code gardent leur ponctuation",
+       /—/.test(readFileSync(`${ROOT}/js/views/home.js`, "utf8")));
 }
 
 // Le nombre d'assertions est affiché plutôt que recopié dans le README, où il

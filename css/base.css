@@ -1,5 +1,60 @@
 /* Coquille de l'application : reset, barre supérieure, boutons, modale, écran de chargement. */
 
+/* ------------------------------------------------------------------- la fonte
+
+   Geist, servie par le site lui-même, en deux sous-ensembles.
+
+   Le projet tournait sur `system-ui`, ce qui n'est pas un choix mais une
+   absence de choix : la page change de fonte selon la machine, donc la
+   composition n'est jamais celle qu'on a réglée, et l'outil n'a aucune voix
+   propre. Une fonte variable règle les deux en un fichier.
+
+   Geist plutôt qu'une autre pour trois raisons tenant à cet outil-ci. Elle
+   couvre 100 à 900, ce dont la page se sert vraiment : 300 pour les grands
+   nombres, 650 pour les titres de section, 700 pour le titre d'accueil. Ses
+   chiffres tabulaires sont de vrais chiffres tabulaires, et cette interface en
+   aligne partout : notes, compteurs de mitigations, identifiants de technique.
+   Et elle tient à 0,56 rem, la taille des cases de la matrice, là où beaucoup
+   de grotesques se ferment.
+
+   Auto-hébergée, jamais appelée chez un tiers : `connect-src` est fermé,
+   `font-src` vaut `'self'`, et une requête vers un CDN de fontes serait à la
+   fois bloquée et une fuite d'adresse IP vers un tiers à chaque visite. Les
+   fichiers viennent de Google Fonts, qui sert les sous-ensembles déjà découpés ;
+   la licence SIL Open Font 1.1 est recopiée dans `fonts/OFL.txt`, comme elle
+   l'exige.
+
+   Deux sous-ensembles et pas un seul : le latin porte le français courant, les
+   guillemets « » et les points de suspension ; le latin étendu porte le reste,
+   et n'est téléchargé que si la page en a besoin. `unicode-range` s'en charge.
+
+   `swap` plutôt que `block` : la page s'affiche tout de suite dans la fonte de
+   secours, puis bascule. Un écran blanc pendant le chargement d'une fonte est
+   toujours pire qu'un changement de fonte. La pile de secours est choisie pour
+   que le saut reste court. */
+
+@font-face {
+    font-family: "Geist";
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+    src: url("../fonts/geist-latin.woff2") format("woff2");
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+                   U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122,
+                   U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: "Geist";
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+    src: url("../fonts/geist-latin-ext.woff2") format("woff2");
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+                   U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF,
+                   U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
 *, *::before, *::after { box-sizing: border-box; }
 
 html, body { height: 100%; }
@@ -82,15 +137,26 @@ body {
     border: 1px solid var(--glass-border);
     border-radius: var(--radius-pill);
     background: var(--glass);
-    -webkit-backdrop-filter: blur(18px) saturate(180%);
-    backdrop-filter: blur(18px) saturate(180%);
+    /* Le flou fait tout le travail que l'opacité ne fait plus. À 38 % de couche,
+       une page défile derrière la barre en restant lisible à travers ; c'est ce
+       qu'on cherche, et c'est ce qui distingue du verre d'un simple voile blanc.
+       26 px de rayon, et la saturation remontée parce que le flou lave les
+       couleurs : sans elle, tout ce qui passe dessous vire au gris. */
+    -webkit-backdrop-filter: blur(26px) saturate(190%);
+    backdrop-filter: blur(26px) saturate(190%);
     box-shadow: inset 0 1px 0 var(--glass-hi), var(--glass-shadow);
     transition: background 0.25s ease, height 0.25s ease, box-shadow 0.25s ease;
 }
 
-/* Dès que la page a défilé, le verre se densifie et la pastille se resserre :
-   la barre passe devant du contenu au lieu du seul haut de page, et doit gagner
-   en opacité pour rester lisible. La classe est posée par main.js. */
+/* Dès que la page a défilé, le verre se densifie et la pastille se resserre.
+
+   Les deux états ne cherchent pas la même chose. Au repos, en haut de page, la
+   barre flotte au-dessus du blanc cassé : 38 % de couche et 26 px de flou, on
+   voit la page à travers, c'est là que le verre se voit. En défilant, elle passe
+   devant les cartes sombres des bénéfices et le pied de page, et sur ce fond une
+   couche légère ramène le libellé d'un lien à un gris sur gris. La transparence
+   cède donc à la lisibilité dès qu'il y a du contenu dessous, ce qui est le bon
+   ordre des priorités. */
 #topbar[data-mode="home"].scrolled {
     height: 52px;
     background: var(--glass-strong);
@@ -164,7 +230,49 @@ body {
 .nav-link:hover::before, .nav-link.current::before { opacity: 1; transform: none; }
 .nav-link > span { position: relative; }
 
+/* N'existe que dans le panneau des écrans étroits. */
+.nav-panel-cta { display: none; }
+
 .topbar-end { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+
+/* --- le bouton du menu étroit ---
+
+   Deux barres et un pseudo-élément : ouvert, la barre du haut pivote et celle du
+   bas s'efface, ce qui donne une croix sans changer de dessin. Aucune image,
+   aucun tracé. Il n'existe que sur l'accueil et sous 900 px. */
+.nav-toggle {
+    display: none;
+    position: relative;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: none;
+    color: var(--text);
+    cursor: pointer;
+}
+.nav-toggle:hover { background: var(--overlay); }
+/* Les deux barres sont les pseudo-éléments d'un conteneur qui, lui, ne tourne
+   jamais. Une barre portée par le conteneur et l'autre par son `::after`
+   donnerait un chevron : le pseudo-élément hérite de la rotation du parent, et
+   les deux angles s'additionnent au lieu de s'opposer. Frères, ils pivotent
+   chacun sur leur propre axe et se croisent. */
+.nav-toggle i { position: absolute; inset: 0; }
+.nav-toggle i::before, .nav-toggle i::after {
+    content: "";
+    position: absolute;
+    left: 11px;
+    width: 16px;
+    height: 1.6px;
+    border-radius: 2px;
+    background: currentColor;
+    transition: transform 0.22s ease;
+}
+.nav-toggle i::before { top: 16px; }
+.nav-toggle i::after { top: 21px; }
+.nav-toggle[aria-expanded="true"] i::before { transform: translateY(2.5px) rotate(45deg); }
+.nav-toggle[aria-expanded="true"] i::after { transform: translateY(-2.5px) rotate(-45deg); }
 
 /* Onglets de layer, dans l'esprit Tidal Cyber */
 #layer-tabs { display: flex; align-items: center; gap: 6px; flex: 1 1 auto; min-width: 0; }
@@ -494,14 +602,73 @@ code { font-size: 0.9em; background: var(--surface-3); padding: 1px 5px; border-
    sensible : à 48 px de haut, tout ce qui déborde casse la mise en page. Le
    badge de version s'y réduit à son numéro — il n'apparaît que sur l'accueil,
    où il ne dispute la place à personne, mais la place est comptée. */
-/* Les quatre ancres ne tiennent pas dans la pastille sous ~900 px. Elles
-   s'effacent, la marque et l'appel à l'action restent : la page se parcourt
-   alors au défilement, ce qu'on fait de toute façon sur un écran de cette
-   largeur. Le menu déplié propre à ces écrans viendra avec la passe responsive,
-   qui doit traiter le téléphone pour lui-même et non comme un bureau rétréci. */
+/* --- les ancres sous 900 px ---
+
+   Les quatre ancres ne tiennent pas dans la pastille. Elles ne disparaissent pas
+   pour autant : elles passent dans un panneau que le bouton déplie sous la
+   barre, de la même matière qu'elle. Une page unique dont on ne peut atteindre
+   les sections qu'au défilement perd la moitié de sa navigation, et c'est sur un
+   téléphone qu'on défile le moins volontiers.
+
+   Le panneau est ancré sur la pastille, qui est déjà en position fixe : il la
+   suit sans calcul. Les liens y prennent la hauteur du doigt, 44 px, et non
+   celle de la souris. */
 @media (max-width: 900px) {
-    #topbar[data-mode="home"] #site-nav { display: none; }
+    .nav-toggle { display: inline-grid; place-items: center; }
+    #topbar[data-mode="app"] .nav-toggle { display: none; }
+
     #topbar[data-mode="home"] { justify-content: space-between; }
+
+    #topbar[data-mode="home"] #site-nav {
+        position: absolute;
+        top: calc(100% + 8px);
+        left: 0;
+        right: 0;
+        display: none;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 2px;
+        padding: 8px;
+        border: 1px solid var(--glass-border);
+        border-radius: 20px;
+        /* Opaque, et non translucide comme la barre. La barre passe devant du
+           contenu qu'on veut deviner ; un menu passe devant du contenu qu'on veut
+           oublier le temps de choisir. Même à 4 % de transparence, le titre de la
+           page — soixante pixels de haut, gras, saturé — restait lisible en
+           filigrane derrière les libellés. Le verre s'arrête donc au bord du
+           panneau : la bordure claire et l'ombre portée, rien de plus. */
+        background: var(--surface-2);
+        box-shadow: inset 0 1px 0 var(--glass-hi), var(--shadow-lg);
+    }
+    #topbar[data-mode="home"] #site-nav.open { display: flex; }
+
+    #topbar[data-mode="home"] .nav-link {
+        display: flex;
+        align-items: center;
+        min-height: 44px;
+        padding: 0 14px;
+        border-radius: 14px;
+        font-size: 0.9rem;
+    }
+
+    /* La pastille noire quitte la barre : trois boutons et une marque ne tiennent
+       pas dans 52 px de haut sans que tout se serre. Elle reprend sa place au bas
+       du panneau, où elle a la largeur d'un vrai libellé. */
+    #topbar[data-mode="home"] #nav-cta { display: none; }
+
+    #topbar[data-mode="home"] .nav-panel-cta {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 44px;
+        margin-top: 6px;
+        border-radius: 14px;
+        background: var(--ink);
+        color: var(--ink-text);
+        font-size: 0.9rem;
+        font-weight: 600;
+        text-decoration: none;
+    }
 }
 
 @media (max-width: 560px) {

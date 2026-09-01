@@ -213,6 +213,30 @@
 
 /* Sur écran étroit, la colonne passe au-dessus de la matrice plutôt que de lui
    disputer une largeur qu'aucune des deux n'a. */
+/* ----------------------------------------------------- écrans peu hauts
+
+   Un portable ouvre le navigateur sur 600 à 700 px de hauteur utile. La colonne
+   de gauche en demandait davantage : la rosace prenait sa hauteur naturelle
+   (~356 px, imposée par la largeur de la colonne), le bloc CVE la sienne, et la
+   liste des mitigations — seule ligne en `1fr` — absorbait le manque en tombant
+   à zéro. Le panneau restait là, réduit à son titre, et c'est exactement le
+   panneau avec lequel on navigue dans l'évaluation : le tableau de bord était
+   inutilisable sur un portable, et c'est ce qui a été remonté.
+
+   Trois règles, dans cet ordre de priorité. La rosace cède la première : c'est
+   une synthèse, elle se lit plus petite, et le `viewBox` la remet à l'échelle
+   sans la déformer. La liste des mitigations reçoit un plancher : sous 160 px
+   elle ne montre plus assez de lignes pour servir. Et si les trois panneaux ne
+   tiennent toujours pas, c'est la colonne entière qui défile, plutôt qu'un
+   panneau qui disparaît en silence. */
+@media (max-height: 820px) {
+    .dash-panel[data-panel="rosace"] .rosace { max-height: 34vh; }
+    #dash-side {
+        grid-template-rows: minmax(0, auto) minmax(160px, 1fr) minmax(0, auto);
+        overflow-y: auto;
+    }
+}
+
 @media (max-width: 900px) {
     #dash { grid-template-columns: minmax(0, 1fr); overflow-y: auto; }
     #dash-side { grid-template-rows: auto auto auto; }
@@ -375,11 +399,37 @@
    sinon l'identifiant passe dessous dans une colonne étroite. */
 #matrix-grid.fit .cell { padding: 3px 16px 3px 4px; }
 #matrix-grid.fit .tactic-head { padding: 5px 3px; }
-/* En plein écran, la barre d'avancement de chaque tactique disparaît : quinze
-   traits bleus alignés sous quinze titres tirent l'œil vers eux alors que ce
-   qu'on vient lire, ce sont les couleurs des cases en dessous. Elle reste dans
-   le tableau de bord, où la matrice n'est qu'un panneau parmi d'autres. */
-#matrix-grid.fit .tactic-head .t-bar { display: none; }
+/* --- les barres d'avancement, et l'alignement des en-têtes ---
+
+   La barre n'existe qu'en plein écran. C'était l'inverse, et c'était le mauvais
+   sens : dans le tableau de bord, la matrice est un panneau parmi d'autres, les
+   colonnes y sont étroites, et quinze traits bleus sous quinze titres de deux
+   lignes faisaient une frange qui tirait l'œil au lieu de le laisser sur les
+   couleurs des cases. En plein écran, la place existe et l'information sert.
+
+   Et en fenêtré, tous les en-têtes prennent la même hauteur, fixée et non plus
+   minimale : « Resource Development » passe à la ligne là où « Execution » tient
+   sur une, et l'en-tête le plus haut décalait sa colonne entière vers le bas.
+   Les rangées ne s'alignaient plus d'une colonne à l'autre, ce qui est
+   précisément ce qu'on demande à une matrice. Le nom est bridé à deux lignes et
+   centré dedans : la hauteur ne dépend plus de ce qui est écrit. */
+.tactic-head .t-bar { display: none; }
+#matrix-grid.fit .tactic-head .t-bar { display: block; }
+
+#matrix-grid:not(.fit) .tactic-head {
+    height: 50px;
+    min-height: 0;
+    padding: 4px 5px;
+}
+#matrix-grid:not(.fit) .tactic-head .t-name {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    /* Un cran plus petit qu'en plein écran : « Reconnaissance » se coupait en
+       plein mot dans une colonne de 96 px, faute d'y tenir sur une ligne. */
+    font-size: 0.63rem;
+}
 
 .tactic-col { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 

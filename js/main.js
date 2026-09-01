@@ -6,7 +6,7 @@ import { loadAttack } from "./attack.js";
 import { initTheme, toggleTheme, current as currentTheme } from "./theme.js";
 import { esc, $, toast, initModal, initDropdowns } from "./ui.js";
 import { progress } from "./layer.js";
-import { renderHome, promptNewLayer } from "./views/home.js";
+import { renderHome, promptNewLayer, arreterVisuels } from "./views/home.js";
 import { renderMatrix, repaintMatrix, resetMatrixView } from "./views/matrix.js";
 import { renderQuiz, resetQuiz } from "./views/quiz.js";
 
@@ -41,14 +41,20 @@ const app = {
         const topbar = $("#topbar");
         if (topbar) {
             topbar.dataset.mode = name === "home" ? "home" : "app";
-            if (name !== "home") topbar.classList.remove("scrolled");
+            if (name !== "home") {
+                topbar.classList.remove("scrolled");
+                // Le menu étroit resterait déplié par-dessus l'outil.
+                $("#site-nav")?.classList.remove("open");
+                $("#nav-toggle")?.setAttribute("aria-expanded", "false");
+            }
         }
 
         // Questionnaire et Exporter sont montés par la vue matrice, qui seule
         // sait les câbler. Ailleurs, ils désigneraient l'écran qu'on regarde.
         if (name !== "matrix") $("#topbar-actions")?.classList.add("hidden");
 
-        if (name === "home") renderHome(this);
+        if (name === "home") { renderHome(this); spySections(); }
+        else arreterVisuels();
         if (name === "matrix") renderMatrix(this);
         if (name === "quiz") renderQuiz(this, options);
 
@@ -68,7 +74,7 @@ function renderTabs() {
     const state = progress(app.layer);
     host.innerHTML = `
         <button class="layer-tab current" id="tab-layer"
-                title="Renommer le layer — ${state.completeMitigations} mitigation(s) traitée(s) sur ${state.mitigations}, ${state.answered} question(s) répondue(s)">
+                title="Renommer le layer. ${state.completeMitigations} mitigation(s) traitée(s) sur ${state.mitigations}, ${state.answered} question(s) répondue(s)">
             <span class="name">${esc(app.layer.name)}</span>
             <span class="pct">${state.completeMitigations}/${state.mitigations}</span>
         </button>
@@ -110,33 +116,38 @@ function leaveLayer(app) {
 /* --------------------------------------------------------- ancres de section
 
    L'accueil est une page unique : les liens de la barre haute n'y mènent nulle
-   part ailleurs, ils y font descendre. Trois choses à câbler, une seule fois
-   pour toute la session — la barre, elle, ne se recompose jamais.
+   part ailleurs, ils y font descendre.
 
-   Le défilement est détourné pour deux raisons. La page ne défile pas dans la
-   fenêtre mais dans `#view-home`, et un `href` seul y laisse le navigateur
-   choisir quel conteneur bouger — il choisit juste, mais pas partout. Et
-   l'adresse ne gagne pas un `#faq` qui, au rechargement suivant, ferait sauter
-   la page avant même que son contenu existe.
+   Le défilement des ancres est détourné pour deux raisons. La page ne défile pas
+   dans la fenêtre mais dans `#view-home`, et un `href` seul y laisse le
+   navigateur choisir quel conteneur bouger. Et l'adresse ne gagne pas un `#faq`
+   qui, au rechargement suivant, ferait sauter la page avant même que son contenu
+   existe.
 
-   Le même écouteur de défilement sert deux fins : densifier le verre de la barre
-   dès qu'on a quitté le haut de page, et marquer l'ancre de la section qu'on
-   regarde. Deux écouteurs pour deux marques auraient fait le même travail deux
-   fois. */
+   Deux marques suivent le défilement : le verre de la barre se densifie dès
+   qu'on a quitté le haut de page, et l'ancre de la section regardée s'allume.
+   Aucune des deux ne passe par un écouteur `scroll`. Un tel écouteur se
+   déclenche à chaque image, et celui-ci devait mesurer quatre sections à chaque
+   fois : quatre `getBoundingClientRect` par tick, donc quatre recalculs de mise
+   en page forcés pendant le geste le plus sensible de la page. Un
+   `IntersectionObserver` fait le même travail hors du fil principal et ne
+   rappelle que lorsqu'un seuil est franchi.
 
-/** Ligne de visée : une section est « celle qu'on regarde » dès qu'elle passe
-    sous la barre haute, avec sa marge d'ancrage. */
+   Les sections sont recomposées à chaque rendu de l'accueil : l'observateur est
+   donc rebranché après le rendu, pas une fois pour toutes. */
+
+/** Marge haute de la ligne de visée : la barre flottante et son ancrage. */
 const VISEE = 96;
+
+/** Observateurs en cours, à couper avant d'en poser de nouveaux. */
+let espions = [];
 
 function initSiteNav() {
     const nav = $("#site-nav");
     const home = $("#view-home");
-    const topbar = $("#topbar");
-    if (!nav || !home || !topbar) return;
+    if (!nav || !home) return;
 
-    const liens = [...nav.querySelectorAll(".nav-link")];
-
-    for (const lien of liens) {
+    for (const lien of nav.querySelectorAll('a[href^="#"]')) {
         lien.addEventListener("click", e => {
             const cible = home.querySelector(lien.getAttribute("href"));
             if (!cible) return;             // section absente : le lien reprend son sens normal
@@ -145,25 +156,109 @@ function initSiteNav() {
         });
     }
 
-    // La pastille d'action lance l'évaluation, là où l'ancre « Démarrer » ne fait
-    // que descendre à la section. Les faire aboutir au même endroit aurait rendu
-    // l'une des deux inutile.
+    // La barre portait deux fois « Démarrer » : l'ancre et la pastille noire, à
+    // deux gestes de distance l'une de l'autre. Deux boutons pour une seule
+    // destination, c'est un bouton de trop. La pastille sert donc à ce qu'elle
+    // seule peut faire, et descend au pied de page, où l'on nous joint.
     const cta = $("#nav-cta");
-    if (cta) cta.onclick = () => promptNewLayer(app);
+    if (cta) cta.onclick = () => home.querySelector("#contact")?.scrollIntoView({ block: "start" });
 
-    const marquerSection = () => {
-        let courante = null;
-        for (const lien of liens) {
-            const cible = home.querySelector(lien.getAttribute("href"));
-            if (cible && cible.getBoundingClientRect().top <= VISEE) courante = lien;
-        }
-        for (const lien of liens) lien.classList.toggle("current", lien === courante);
+    initMenuEtroit(nav);
+}
+
+/**
+ * Le menu des écrans étroits.
+ *
+ * Le panneau n'existe que dans le CSS, sous 900 px : ici on ne fait que poser
+ * l'état. `aria-expanded` sur le bouton et la classe sur la liste disent la même
+ * chose à deux publics, et rien d'autre n'a besoin de le savoir.
+ *
+ * Un menu qui ne se referme que par son propre bouton est un menu dans lequel on
+ * se retrouve coincé : il se referme aussi au choix d'une ancre, à Échap, et au
+ * clic à côté. Le clic extérieur est écouté sur le document en phase de
+ * remontée, donc après que le bouton a traité le sien.
+ */
+function initMenuEtroit(nav) {
+    const bouton = $("#nav-toggle");
+    if (!bouton) return;
+
+    const fermer = () => {
+        nav.classList.remove("open");
+        bouton.setAttribute("aria-expanded", "false");
     };
 
-    home.addEventListener("scroll", () => {
-        topbar.classList.toggle("scrolled", home.scrollTop > 12);
-        marquerSection();
-    }, { passive: true });
+    bouton.onclick = () => {
+        const ouvert = nav.classList.toggle("open");
+        bouton.setAttribute("aria-expanded", String(ouvert));
+    };
+
+    for (const lien of nav.querySelectorAll('a[href^="#"]')) lien.addEventListener("click", fermer);
+
+    document.addEventListener("keydown", e => {
+        if (e.key !== "Escape" || !nav.classList.contains("open")) return;
+        fermer();
+        bouton.focus();          // le clavier ne doit pas se retrouver nulle part
+    });
+
+    document.addEventListener("click", e => {
+        if (!nav.classList.contains("open")) return;
+        if (nav.contains(e.target) || bouton.contains(e.target)) return;
+        fermer();
+    });
+}
+
+/**
+ * Rebranche les deux observateurs sur les sections fraîchement rendues.
+ *
+ * Appelé après chaque rendu de l'accueil. Sans `IntersectionObserver` — jsdom,
+ * et les navigateurs d'avant 2019 — la barre reste dans son état de repos et les
+ * ancres continuent de fonctionner : c'est une finition, pas une fonction.
+ */
+function spySections() {
+    for (const espion of espions) espion.disconnect();
+    espions = [];
+
+    const home = $("#view-home");
+    const topbar = $("#topbar");
+    const nav = $("#site-nav");
+    if (!home || !topbar || !nav || typeof IntersectionObserver !== "function") return;
+
+    // Le verre. Une sentinelle d'un pixel en haut de la page : tant qu'elle est
+    // visible, on est au repos ; dès qu'elle sort, la barre passe devant du
+    // contenu et doit gagner en opacité.
+    const sentinelle = home.querySelector(".home-sentinel");
+    if (sentinelle) {
+        const veille = new IntersectionObserver(
+            ([entree]) => topbar.classList.toggle("scrolled", !entree.isIntersecting),
+            { root: home },
+        );
+        veille.observe(sentinelle);
+        espions.push(veille);
+    }
+
+    // L'ancre courante. La marge basse de -55 % rétrécit la fenêtre d'observation
+    // à la bande haute de l'écran : sans elle, trois sections sont « visibles »
+    // en même temps et la marque saute d'un lien à l'autre au moindre geste.
+    const liens = [...nav.querySelectorAll(".nav-link")];
+    const cibles = liens
+        .map(lien => ({ lien, section: home.querySelector(lien.getAttribute("href")) }))
+        .filter(paire => paire.section);
+    if (!cibles.length) return;
+
+    const vues = new Set();
+    const guetteur = new IntersectionObserver(entrees => {
+        for (const entree of entrees) {
+            if (entree.isIntersecting) vues.add(entree.target);
+            else vues.delete(entree.target);
+        }
+        // La plus haute des sections visibles, dans l'ordre du document.
+        const courante = cibles.find(paire => vues.has(paire.section));
+        for (const { lien } of cibles) lien.classList.toggle("current", lien === courante?.lien);
+    }, { root: home, rootMargin: `-${VISEE}px 0px -55% 0px` });
+
+    for (const { section } of cibles) guetteur.observe(section);
+    espions.push(guetteur);
+
 }
 
 /* ----------------------------------------------------------------- démarrage */
