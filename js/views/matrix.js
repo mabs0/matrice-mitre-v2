@@ -197,12 +197,25 @@ function placePanel(dropdown) {
     const panel = dropdown.querySelector(".dropdown-panel");
     const rect = button.getBoundingClientRect();
     const margin = 8;
+    const ecart = 5;
 
-    panel.style.top = `${rect.bottom + 5}px`;
-    panel.style.left = "0px";                       // pour mesurer la largeur réelle
-    const width = panel.offsetWidth;
+    // On mesure d'abord, on place ensuite : la largeur comme la hauteur
+    // dépendent du contenu, et le panneau est déjà affiché à ce stade.
+    panel.style.top = "0px";
+    panel.style.left = "0px";
+    const { offsetWidth: width, offsetHeight: height } = panel;
+
     const left = Math.min(rect.left, window.innerWidth - width - margin);
     panel.style.left = `${Math.max(margin, left)}px`;
+
+    // Sous le bouton si la place existe, au-dessus sinon. Sans cette bascule, un
+    // bouton posé en bas de l'écran — c'est le cas de « Exporter », qui descend
+    // en pied d'écran sur un téléphone — ouvrait son panneau hors de la fenêtre,
+    // et il n'y avait aucun moyen de le voir.
+    const tientDessous = rect.bottom + ecart + height + margin <= window.innerHeight;
+    panel.style.top = tientDessous
+        ? `${rect.bottom + ecart}px`
+        : `${Math.max(margin, rect.top - ecart - height)}px`;
 }
 
 /* ------------------------------------------------------------------ légende */

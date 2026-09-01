@@ -311,7 +311,7 @@
    fond, l'autre non, ce qui se lisait comme un choix déjà fait plutôt que comme
    deux chemins ouverts. C'est le bouton qui porte l'accent, pas la carte. */
 
-.band-start { background: var(--surface); padding: clamp(64px, 9vw, 112px) 0; }
+.band-start { background: var(--surface); padding: clamp(48px, 6vw, 84px) 0; }
 
 .home-actions {
     display: grid;
@@ -368,7 +368,7 @@
    écran haut, on lit « De l'évaluation à la cartographie » en même temps que
    l'étape qu'on regarde, ce qui est précisément le rapport entre les deux. */
 
-.band-steps { background: var(--bg-soft); padding: clamp(64px, 9vw, 112px) 0; }
+.band-steps { background: var(--bg-soft); padding: clamp(48px, 6vw, 84px) 0; }
 
 .steps-grid {
     display: grid;
@@ -382,13 +382,23 @@
    laisser sur les étapes. */
 .steps-intro { position: static; }
 
+/* L'écart entre deux étapes est déclaré une fois : le filet qui les relie s'y
+   réfère, au lieu de recopier la valeur et de diverger au premier réglage.
+
+   Il est large, et c'est le point. Trois étapes serrées se lisent comme une
+   liste à puces ; espacées, elles se lisent comme un parcours, chacune ayant le
+   temps d'être un moment distinct. C'est ce que fait la section « The
+   Architecture of Nature » de la référence. La bande, elle, a perdu du
+   rembourrage dans le même mouvement : c'est entre les étapes qu'il faut de
+   l'air, pas autour du bloc. */
 .home-steps {
+    --ecart: clamp(46px, 6.5vw, 84px);
     list-style: none;
     margin: 0;
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: clamp(28px, 4vw, 44px);
+    gap: var(--ecart);
 }
 
 /* Le décalage de la deuxième étape casse l'alignement des trois blocs : le
@@ -402,7 +412,7 @@
     position: absolute;
     left: 21px;
     top: 46px;
-    bottom: calc(-1 * clamp(28px, 4vw, 44px));
+    bottom: calc(-1 * var(--ecart));
     width: 1px;
     background: linear-gradient(to bottom, var(--border-strong), transparent);
 }
@@ -443,7 +453,7 @@
    jour par home.js ; sans elles — au clavier, au doigt — le halo se centre au
    milieu de la carte, ce qui reste correct. */
 
-.band-benefits { background: var(--bg); padding: clamp(64px, 9vw, 112px) 0; }
+.band-benefits { background: var(--bg); padding: clamp(48px, 6vw, 84px) 0; }
 
 .benefits {
     display: grid;
@@ -517,7 +527,7 @@
 
 /* --------------------------------------------------------------------- FAQ */
 
-.band-faq { background: var(--surface); padding: clamp(64px, 9vw, 112px) 0; }
+.band-faq { background: var(--surface); padding: clamp(48px, 6vw, 84px) 0; }
 
 /* En-tête centré, questions dessous sur une seule colonne resserrée.
 

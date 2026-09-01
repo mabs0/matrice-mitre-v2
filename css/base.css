@@ -673,21 +673,43 @@ code { font-size: 0.9em; background: var(--surface-3); padding: 1px 5px; border-
 
 /* --- la barre d'outil sur un écran étroit ---
 
-   Elle porte cinq choses à 430 px de large : la marque, l'onglet du layer avec
-   son avancement, sa croix de fermeture, « Questionnaire », « Exporter » et la
-   bascule de thème. Elles se chevauchaient, faute de place.
+   À 430 px, elle portait six choses : la mascotte, « MAPTRIX », l'onglet du
+   layer, sa croix, « Questionnaire », « Exporter » et la bascule de thème. Rien
+   ne pouvait tenir, et rétrécir la marque n'a fait que repousser le problème
+   d'une trentaine de pixels — le chevauchement revenait dès que le nom du layer
+   faisait plus de deux mots.
 
-   Ce qui cède est ce qui se déduit. Le mot « MAPTRIX » s'efface, la mascotte
-   reste — elle suffit à désigner le retour à l'accueil, et c'est le même geste.
-   Les boutons perdent leurs marges intérieures. L'onglet du layer, lui, garde sa
-   place : c'est le seul élément qui porte une information qu'on ne peut pas
-   retrouver ailleurs, le nom de l'évaluation et son avancement. */
+   Il fallait donc en sortir deux, pas les serrer. Ce sont les deux actions qui
+   descendent, en barre fixe au bas de l'écran : ce sont des actions, pas des
+   repères, elles gagnent à être là où se pose le pouce, et elles y récupèrent
+   une largeur de vrai bouton au lieu d'une étiquette tronquée. La barre haute
+   retrouve alors ce qu'elle doit dire — d'où l'on vient, et où l'on en est.
+
+   Le déplacement est entièrement en CSS : c'est le même élément, aux mêmes
+   gestionnaires, à une autre place. `.hidden` continue de le masquer hors de la
+   matrice, sa règle portant `!important`. */
 @media (max-width: 640px) {
-    #topbar[data-mode="app"] .brand { font-size: 0; gap: 0; }
-    #topbar[data-mode="app"] .brand-mascot { font-size: 1rem; }
     #topbar[data-mode="app"] { gap: 8px; }
-    #topbar[data-mode="app"] .btn-sm { padding: 5px 8px; font-size: 0.68rem; }
-    #topbar-actions { gap: 5px; }
+
+    #topbar[data-mode="app"] #topbar-actions {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 70;
+        gap: 8px;
+        padding: 8px 12px;
+        /* Sur un téléphone à encoche, la barre système mange le bas de l'écran. */
+        padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+        background: var(--surface);
+        border-top: 1px solid var(--border);
+    }
+    #topbar[data-mode="app"] #topbar-actions > * { flex: 1 1 0; min-width: 0; }
+    #topbar[data-mode="app"] #topbar-actions .btn { width: 100%; padding: 10px 12px; font-size: 0.78rem; }
+
+    /* La vue rend au pied de barre la hauteur qu'il lui prend, sinon il recouvre
+       la fin de ce qu'on fait défiler. */
+    #view-matrix { padding-bottom: 54px; }
 }
 
 @media (max-width: 560px) {

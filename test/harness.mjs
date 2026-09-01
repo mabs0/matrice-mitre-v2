@@ -3425,20 +3425,39 @@ console.log("\n[42] Hauteurs d'en-tête, retour à l'accueil, tableau de bord au
 
     /* --- la barre d'outil ne se chevauche plus ---
 
-       Cinq éléments à 430 px : marque, onglet du layer, sa croix, deux actions et
-       la bascule de thème. Le mot « MAPTRIX » cède, la mascotte reste — elle
-       suffit à désigner le retour à l'accueil, et c'est le même bouton. */
+       Six éléments se disputaient 430 px. Rétrécir la marque ne faisait que
+       repousser le problème : le chevauchement revenait dès que le nom du layer
+       faisait plus de deux mots. Il fallait en sortir deux, pas les serrer. */
     const baseCss = readFileSync(`${ROOT}/css/base.css`, "utf8");
     const serre = /@media\s*\(max-width:\s*640px\)\s*\{([\s\S]*?)\n\}/.exec(baseCss)?.[1] ?? "";
-    ok("sur un écran étroit, la marque se réduit à sa mascotte",
-       /#topbar\[data-mode="app"\] \.brand\s*\{[^}]*font-size:\s*0/.test(serre) &&
-       /#topbar\[data-mode="app"\] \.brand-mascot\s*\{[^}]*font-size:/.test(serre),
+    ok("les deux actions du layer descendent en pied d'écran",
+       /#topbar\[data-mode="app"\] #topbar-actions\s*\{[^}]*position:\s*fixed/.test(serre) &&
+       /#topbar\[data-mode="app"\] #topbar-actions\s*\{[^}]*bottom:\s*0/.test(serre),
        serre.replace(/\s+/g, " ").slice(0, 110));
-    // Elle reste cliquable et nommée : c'est un bouton avec un `title`, pas une
-    // image muette.
-    ok("et elle reste le retour à l'accueil, annoncé",
+    ok("elles y prennent la largeur d'un vrai bouton",
+       /#topbar-actions > \*\s*\{[^}]*flex:\s*1 1 0/.test(serre));
+    // Un pied de barre fixe recouvre la fin de ce qu'on fait défiler si la vue
+    // ne lui rend pas sa hauteur.
+    ok("et la vue leur rend la place qu'elles prennent",
+       /#view-matrix\s*\{\s*padding-bottom:\s*\d+px/.test(serre));
+    // La barre haute retrouve alors ce qu'elle doit dire : d'où l'on vient, et
+    // où l'on en est.
+    ok("la marque garde son nom, et reste le retour à l'accueil",
+       // « font-size: 0 » exactement, et non « 0.95rem » : sans le point-virgule,
+       // le motif attrapait toutes les tailles commençant par un zéro.
+       !/\.brand\s*\{[^}]*font-size:\s*0\s*;/.test(baseCss) &&
        /<button class="brand" id="brand" title="Retour à l'accueil">/
            .test(readFileSync(`${ROOT}/index.html`, "utf8")));
+    // Le déplacement est en CSS : c'est le même élément, aux mêmes gestionnaires.
+    // Il doit donc continuer d'obéir à `.hidden` hors de la matrice.
+    ok("le pied de barre disparaît hors de la matrice",
+       /\.hidden\s*\{\s*display:\s*none\s*!important/.test(baseCss));
+
+    // Un panneau déroulant ouvert depuis un bouton du bas sortirait de la
+    // fenêtre : il bascule au-dessus quand la place manque dessous.
+    ok("un menu déroulant s'ouvre vers le haut quand il ne tient pas dessous",
+       /tientDessous[\s\S]{0,200}rect\.top - ecart - height/
+           .test(readFileSync(`${ROOT}/js/views/matrix.js`, "utf8")));
 
     /* --- deux réglages quittent la barre d'outils sur un téléphone ---
 
