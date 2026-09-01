@@ -122,6 +122,26 @@ async function fetchWithProgress(url, version, onProgress) {
     throw last;
 }
 
+/**
+ * Le corps annoncé est-il compressé ?
+ *
+ * On ne peut pas le demander : `content-encoding` n'est pas dans la liste
+ * blanche CORS, et GitHub ne l'expose pas — `headers.get` rend `null` que le
+ * flux soit compressé ou non. Reste l'ordre de grandeur, et il est franc : le
+ * bundle pèse ~54 Mo en clair contre ~6 Mo gzippé, un facteur dix. Tout ce qui
+ * est annoncé au-delà de 20 Mo est donc déjà du texte décompressé, et sa taille
+ * est la taille finale : la multiplier viserait dix fois trop haut.
+ *
+ * Ce cas n'est pas théorique. Derrière un proxy d'entreprise qui déchiffre et
+ * inspecte le trafic, la réponse arrive décompressée et `content-encoding`
+ * disparaît : `content-length` vaut alors les 54 Mo réels. Sans ce test la
+ * jauge annonçait ~480 Mo à recevoir et rampait jusqu'à 11 % avant de sauter
+ * d'un coup à la fin.
+ */
+function estCompresse(annoncee) {
+    return annoncee > 0 && annoncee < 20 * 1024 * 1024;
+}
+
 /** Un essai de téléchargement, en rendant compte de l'avancement réel. */
 async function download(url, version, onProgress, cache) {
     const resp = await fetch(url, { cache });
@@ -133,8 +153,8 @@ async function download(url, version, onProgress, cache) {
     // le flux en le réécrivant le supprime, et il n'y a alors aucune taille à
     // viser. On rend la main sans ratio, la barre reste indéterminée, et le
     // compteur d'octets continue de montrer que ça avance.
-    const compressed = Number(resp.headers.get("content-length")) || 0;
-    let estimated = compressed * GZIP_RATIO;
+    const annoncee = Number(resp.headers.get("content-length")) || 0;
+    let estimated = annoncee * (estCompresse(annoncee) ? GZIP_RATIO : 1);
 
     const reader = resp.body.getReader();
     const chunks = [];
