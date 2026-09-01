@@ -50,12 +50,20 @@ function cmpVersion(a, b) {
 /**
  * Rapport moyen entre la taille décompressée du bundle et sa taille sur le fil.
  * `content-length` donne la taille compressée alors que le flux rend les octets
- * décompressés : sans ce facteur on ne peut pas afficher de jauge. Mesuré à
- * 5,94 sur la v19.1 (53,3 Mo pour 9,0 Mo) et stable d'une version à l'autre,
- * la composition du fichier ne changeant pas. L'estimation ne sert qu'à
- * l'affichage — elle est bornée à 99 % jusqu'à la fin réelle du transfert.
+ * décompressés : sans ce facteur on ne peut pas afficher de jauge.
+ *
+ * Mesuré à 9,04 sur la v19.2 (53,8 Mo pour 5,95 Mo). Il valait 5,94 sur la
+ * v19.1 (53,3 Mo pour 9,0 Mo) : le rapport n'est donc *pas* stable d'une
+ * version à l'autre, contrairement à ce qui était supposé ici — à taille
+ * décompressée quasi identique, MITRE a publié la 19.2 nettement mieux
+ * compressée. Une valeur trop basse ne ralentit rien, mais elle fait plafonner
+ * la jauge à 99 % avant la fin : avec 5,9 sur la 19.2, elle y arrivait aux deux
+ * tiers du transfert et le dernier tiers paraissait figé.
+ *
+ * À revérifier à chaque version majeure. L'estimation ne sert qu'à l'affichage —
+ * elle est bornée à 99 % jusqu'à la fin réelle du transfert.
  */
-const GZIP_RATIO = 5.9;
+const GZIP_RATIO = 9.0;
 
 /**
  * Charge et normalise la matrice Enterprise.
