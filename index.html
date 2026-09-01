@@ -10,11 +10,17 @@
         Politique de sécurité du contenu.
 
         Ce qu'elle sert à empêcher : qu'un morceau de texte venu d'ailleurs
-        s'exécute comme du script. La page manipule un référentiel de 50 Mo
-        téléchargé chez MITRE, des fichiers de layer déposés par l'utilisateur et
-        des classeurs Excel relus cellule par cellule — trois entrées où du texte
+        s'exécute comme du script. La page manipule un référentiel MITRE
+        embarqué, des fichiers de layer déposés par l'utilisateur et des
+        classeurs Excel relus cellule par cellule — trois entrées où du texte
         étranger circule. Si l'une d'elles arrivait un jour à poser du code dans
         la page, c'est ici qu'il serait arrêté.
+
+        `connect-src` est fermé : depuis que le référentiel est généré et
+        embarqué, la page ne fait plus aucune requête réseau de son propre chef.
+        La seule ressource distante restante est la bibliothèque Excel, chargée
+        à la demande par balise `script` — donc régie par `script-src`, avec son
+        empreinte.
 
         `script-src` ne contient ni `unsafe-inline` ni `unsafe-eval`. Les deux
         scripts en ligne du document sont autorisés par leur empreinte, calculée
@@ -42,10 +48,10 @@
     -->
     <meta http-equiv="Content-Security-Policy" content="
         default-src 'none';
-        script-src 'strict-dynamic' 'sha256-sE/lBzfUfu3Tdh7MNmbD6/dVRMAehsSToRncZiztbls=' 'sha256-VoFGUqbezwBbXMA66IWf5wBt3W2yWq4O52EzVbgWqzw=' 'self' https://cdnjs.cloudflare.com;
+        script-src 'strict-dynamic' 'sha256-uxt/S+gtwxhpEN9fqISjul5NApmZnTNWtTh92SsTBFY=' 'sha256-G4aUtwvfmOJcCWSxnZd2vQEyHQJl8fvItgIe/8Enm6E=' 'self' https://cdnjs.cloudflare.com;
         style-src 'self' 'unsafe-inline';
         img-src 'self' data: blob:;
-        connect-src https://raw.githubusercontent.com;
+        connect-src 'none';
         font-src 'self';
         base-uri 'none';
         form-action 'none';
@@ -113,7 +119,7 @@
             && HTMLScriptElement.supports("importmap");
 
         var modules = [
-            "attack", "catalog", "crypto", "excel", "io", "layer", "main", "scoring",
+            "attack", "attack-data", "catalog", "crypto", "excel", "io", "layer", "main", "scoring",
             "shared-questions", "theme", "tool-questions", "ui",
             "views/home", "views/home-visuals", "views/matrix", "views/quiz",
         ];
@@ -240,11 +246,9 @@
             if (window.__ctrmBooted || !document.getElementById("boot")) return;
             showProblem(
                 "Le démarrage n'aboutit pas",
-                failure || "Aucune erreur JavaScript remontée : le transfert des données ATT&amp;CK "
-                    + "est probablement encore en cours ou bloqué.",
-                "Ouvrez la console du navigateur (F12) et envoyez le message d'erreur. "
-                + "Vérifiez aussi qu'un filtrage réseau ne bloque pas "
-                + "<code>raw.githubusercontent.com</code>."
+                failure || "Aucune erreur JavaScript remontée : la construction de la matrice "
+                    + "est probablement encore en cours.",
+                "Ouvrez la console du navigateur (F12) et envoyez le message d'erreur."
             );
         }, 25000);
     })();

@@ -157,19 +157,16 @@ async function boot() {
     try {
         app.data = await loadAttack(report);
     } catch (err) {
-        // On ne présume pas de la cause : un problème réseau et un défaut de
-        // l'application donnent deux écrans différents.
-        const networkish = /HTTP \d|Failed to fetch|NetworkError|index\.json|bundle/i.test(err.message);
+        // La distinction « erreur réseau / erreur applicative » n'a plus lieu
+        // d'être : le référentiel est embarqué, le démarrage ne fait plus aucune
+        // requête. Ce qui reste, c'est un module qui ne se charge pas — et le
+        // cas de loin le plus fréquent est le mélange de versions en cache.
         $("#boot").innerHTML = `
             <h1>Chargement impossible</h1>
             <p class="err">${esc(err.message)}</p>
-            <p class="fix">${networkish
-                ? `Les données sont relues chez MITRE à chaque chargement : vérifiez la connexion
-                   et qu'un filtrage réseau ne bloque pas <code>raw.githubusercontent.com</code>.`
-                : `Cette erreur ne vient pas du réseau. Le plus souvent, c'est un
-                   <code>index.html</code> encore en cache avec des scripts déjà rechargés :
-                   forcez le rechargement avec <b>Ctrl+Maj+R</b>. Si le message persiste,
-                   envoyez-le tel quel.`}</p>
+            <p class="fix">Le plus souvent, c'est un <code>index.html</code> encore en cache
+               avec des scripts déjà rechargés : forcez le rechargement avec
+               <b>Ctrl+Maj+R</b>. Si le message persiste, envoyez-le tel quel.</p>
             <button class="btn btn-primary" id="boot-retry">Réessayer</button>`;
         // Câblé ici plutôt qu'en attribut `onclick` : un gestionnaire écrit dans
         // le markup est du script en ligne, que la politique de sécurité du

@@ -3,7 +3,8 @@
    questionnaire alimente la matrice et que l'export/import fait un aller-retour. */
 
 import { JSDOM } from "jsdom";
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync, readdirSync, mkdtempSync, cpSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import nodeCrypto from "node:crypto";
 import ExcelJS from "exceljs";
 
@@ -85,6 +86,30 @@ const index = {
     }],
 };
 
+/* ------------------------------------- l'application, sur un jeu d'essai réduit
+
+   Les données ne sont plus téléchargées : `js/attack-data.js` est un module
+   généré, importé statiquement par `attack.js`. Pour éprouver l'application sur
+   le mini-bundle ci-dessus plutôt que sur les 222 techniques réelles, on fait
+   tourner les modules depuis une copie temporaire de `js/` dont seul ce fichier
+   est remplacé. Rien n'est injecté dans le code de production, et le fichier
+   généré du dépôt n'est jamais touché.
+
+   La réduction est faite par `reduire()`, importée du générateur lui-même : ce
+   que les tests exercent est donc exactement la transformation qui produit le
+   fichier publié, et non une seconde implémentation qui pourrait diverger. */
+
+const { reduire } = await import(`${ROOT}/tools/build-attack.mjs`);
+
+const APP = mkdtempSync(resolve(tmpdir(), "maptrix-banc-"));
+process.on("exit", () => { try { rmSync(APP, { recursive: true, force: true }); } catch {} });
+cpSync(`${ROOT}/js`, `${APP}/js`, { recursive: true });
+
+const RELEASE = index.collections[0].versions[0];      // 19.1, la plus récente du faux index
+const DONNEES = reduire(bundle, RELEASE);
+writeFileSync(`${APP}/js/attack-data.js`,
+              `export default ${JSON.stringify(DONNEES)};\n`);
+
 /* ------------------------------------------------------------------- jsdom */
 
 const html = readFileSync(`${ROOT}/index.html`, "utf8")
@@ -147,38 +172,28 @@ window.prompt = () => "";
    son chargement, et le chemin d'import complet devient éprouvable ici. */
 globalThis.ExcelJS = ExcelJS;
 
+/* Le démarrage ne fait plus aucune requête : le référentiel est embarqué, et la
+   bibliothèque Excel est posée en global ci-dessus. Toute sortie réseau serait
+   donc une régression — on la piège plutôt que de la servir. */
 const fetched = [];
 globalThis.fetch = async (url, opts) => {
     fetched.push({ url: String(url), cache: opts?.cache });
-    const payload = String(url).includes("index.json") ? index : bundle;
-    const text = JSON.stringify(payload);
-    const bytes = new TextEncoder().encode(text);
-
-    // On rend un vrai flux, pour exercer le chemin de lecture incrémentale.
-    let sent = false;
-    return {
-        ok: true,
-        status: 200,
-        headers: { get: name => (name === "content-length" ? String(bytes.length) : null) },
-        json: async () => payload,
-        text: async () => text,
-        body: {
-            getReader: () => ({
-                read: async () => (sent ? { done: true } : (sent = true, { done: false, value: bytes })),
-            }),
-        },
-    };
+    throw new Error(`requête réseau inattendue : ${url}`);
 };
 
 /* --------------------------------------------------------------- démarrage */
 
 console.log("\n[1] Démarrage et chargement des données");
-await import(`${ROOT}/js/main.js`);
+await import(`${APP}/js/main.js`);
 await new Promise(r => setTimeout(r, 60));
 
-ok("index.json relu sans cache", fetched.some(f => f.url.includes("index.json") && f.cache === "no-store"));
-ok("version la plus récente choisie", fetched.some(f => f.url.includes("19.1")),
-   fetched.map(f => f.url.split("/").pop()).join(", "));
+/* Le référentiel est embarqué : le démarrage ne doit toucher au réseau ni pour
+   l'index des versions, ni pour le bundle. C'est la propriété qui fait tenir les
+   0,4 s de démarrage derrière un proxy qui décompresse tout, et rien d'autre
+   dans le banc ne la surveillerait. */
+ok("aucune requête réseau au démarrage", fetched.length === 0,
+   fetched.map(f => f.url).join(", "));
+ok("la version affichée vient du fichier généré", DONNEES.version === "19.1", DONNEES.version);
 ok("écran de chargement retiré", !window.document.getElementById("boot"));
 ok("badge de version renseigné",
    window.document.getElementById("version-text").textContent.includes("19.1"));
@@ -239,7 +254,7 @@ for (const cb of window.document.querySelectorAll("#platform-panel input[data-pl
 
 console.log("\n[5] Questionnaire sur tout le catalogue");
 const { CATALOG: CAT, QUESTIONNAIRES: QST, totalQuestions } =
-    await import(`${ROOT}/js/catalog.js`);
+    await import(`${APP}/js/catalog.js`);
 ok("le catalogue couvre les 44 mitigations du référentiel", CAT.size === 44, CAT.size);
 ok("une seule est sans questionnaire", CAT.size - QST.size === 1,
    [...CAT.keys()].filter(id => !QST.has(id)).join(","));
@@ -380,12 +395,12 @@ ok("la mitigation sans questionnaire est signalée, pas notée",
 /* -------------------------------------------------------- aller-retour fichier */
 
 console.log("\n[9] Aller-retour export / import");
-const { toJSON, fromJSON, progress } = await import(`${ROOT}/js/layer.js`);
-const { buildMatrixScores, mitigationLevels } = await import(`${ROOT}/js/scoring.js`);
+const { toJSON, fromJSON, progress } = await import(`${APP}/js/layer.js`);
+const { buildMatrixScores, mitigationLevels } = await import(`${APP}/js/scoring.js`);
 
 // À partir d'ici, CATALOG désigne le catalogue de travail : les mitigations
 // évaluables, celles que le layer parcourt réellement.
-const { QUESTIONNAIRES: CATALOG } = await import(`${ROOT}/js/catalog.js`);
+const { QUESTIONNAIRES: CATALOG } = await import(`${APP}/js/catalog.js`);
 const rebuilt = fromJSON(toJSON({
     schema: "ctrm-layer/1", name: "Test", created: "", modified: "", attackVersion: "19.1",
     respondent: { name: "M", org: "O", email: "e" }, scoring: "last-yes", aggregation: "average",
@@ -399,7 +414,7 @@ ok("le catalogue n'est pas sérialisé", !toJSON(rebuilt).includes('"questions"'
 // Excel : export, écriture réelle du fichier, puis réimport depuis les octets.
 // Passer par le buffer et non par l'objet en mémoire est le seul moyen de
 // vérifier que ce qui est *écrit* se relit.
-const { buildWorkbook, readWorkbook } = await import(`${ROOT}/js/excel.js`);
+const { buildWorkbook, readWorkbook } = await import(`${APP}/js/excel.js`);
 const fauxData = {
     version: "19.1",
     mitigations: [{ id: "M1032", name: "MFA", techniques: ["T1078"] }],
@@ -475,7 +490,7 @@ ok("une feuille « Réponses » sans réponse valable se distingue d'un format r
 /* ------------------------------------------------------ JSON chiffré */
 
 console.log("\n[10] Aller-retour JSON chiffré");
-const { exportJSON, exportName, readLayerFile, isEncrypted } = await import(`${ROOT}/js/io.js`);
+const { exportJSON, exportName, readLayerFile, isEncrypted } = await import(`${APP}/js/io.js`);
 
 // On intercepte le téléchargement pour récupérer le contenu produit.
 let produced = null;
@@ -505,7 +520,7 @@ ok("clé manquante signalée", /chiffré/.test(noKey), noKey);
 
 /* --- ce que le chiffrement doit garantir, et pas seulement « ça revient » --- */
 {
-    const { PREFIXE, chiffrer, dechiffrer } = await import(`${ROOT}/js/crypto.js`);
+    const { PREFIXE, chiffrer, dechiffrer } = await import(`${APP}/js/crypto.js`);
 
     // Le sel et l'IV sont tirés au sort à chaque export : deux exports du même
     // layer avec la même clé ne se ressemblent pas. Sans cela, une table
@@ -565,7 +580,7 @@ globalThis.Blob = window.Blob = RealBlob;
 /* ---------------------------------------------- avancement et ordre de parcours */
 
 console.log("\n[11] Avancement et ordre de parcours");
-const { questionnaireState, nextTarget, createLayer, setAnswer } = await import(`${ROOT}/js/layer.js`);
+const { questionnaireState, nextTarget, createLayer, setAnswer } = await import(`${APP}/js/layer.js`);
 const q1032 = CATALOG.get("M1032");
 
 // Un « Non » à la première question clôt la mitigation : elle est traitée.
@@ -772,14 +787,14 @@ ok("la matrice repart vierge",
 console.log("\n[18] Le niveau 0 est atteignable");
 // Aucune des 327 questions du classeur ne vise le niveau 0 : c'est le plancher
 // obtenu quand la première question est « Non », donc sans aucun « Oui ».
-const { mitigationLevel } = await import(`${ROOT}/js/scoring.js`);
+const { mitigationLevel } = await import(`${APP}/js/scoring.js`);
 const noQuestionAtZero = [...CATALOG.values()]
     .every(m => m.questions.every(q => q.level !== 0));
 ok("aucune question ne vise le niveau 0", noQuestionAtZero);
 
 // On lit par résolution : si la première question est commune, la réponse est
 // enregistrée chez son porteur et non sous cette mitigation.
-const { resolvedEntries } = await import(`${ROOT}/js/shared-questions.js`);
+const { resolvedEntries } = await import(`${APP}/js/shared-questions.js`);
 for (const id of [...CATALOG.keys()]) {
     const questionnaire = CATALOG.get(id);
     const zero = createLayer({ name: `zéro ${id}` });
@@ -802,16 +817,40 @@ window.document.getElementById("r-matrix").click();
 ok("la case couverte par cette mitigation passe en niveau 0",
    levelClassOf("T1078") === "lvl-0", levelClassOf("T1078"));
 
-console.log("\n[19] Progression chiffrée du téléchargement");
-const { loadAttack } = await import(`${ROOT}/js/attack.js`);
+console.log("\n[19] Le chargement rend la main sans transfert");
+/* Il n'y a plus d'octets à compter : le contrat qui reste est que `main.js`
+   reçoive un rapport d'avancement terminé, pour que son écran de démarrage se
+   retire au lieu de laisser tourner une barre indéfiniment. */
+const { loadAttack, construire } = await import(`${APP}/js/attack.js`);
 const seen = [];
-await loadAttack((msg, ratio) => seen.push({ msg, ratio }));
-ok("des ratios sont rapportés", seen.some(s => typeof s.ratio === "number"));
+const chargees = await loadAttack((msg, ratio) => seen.push({ msg, ratio }));
+ok("un avancement est rapporté", seen.length > 0);
 ok("les ratios restent dans [0,1]", seen.every(s => s.ratio === undefined || (s.ratio >= 0 && s.ratio <= 1)),
    seen.filter(s => s.ratio !== undefined).map(s => s.ratio.toFixed(2)).join(", "));
 ok("le dernier ratio vaut 1", seen.filter(s => s.ratio !== undefined).at(-1).ratio === 1);
-ok("les octets reçus sont annoncés", seen.some(s => /Mo/.test(s.msg)),
-   seen.map(s => s.msg).find(m => /Mo/.test(m)));
+ok("la version est annoncée", seen.some(s => /19\.1/.test(s.msg)), seen.map(s => s.msg).join(" | "));
+ok("les données sont celles du fichier généré", chargees.version === "19.1");
+
+/* `construire` est le seul endroit où la structure de travail est rebâtie : les
+   index dérivés doivent rester d'accord avec les listes plates dont ils sortent,
+   sinon la matrice affiche une couverture fausse sans que rien ne le signale. */
+{
+    const d = construire(DONNEES);
+    ok("chaque technique parente est indexée",
+       d.techniques.every(t => d.techniqueById.get(t.id) === t));
+    ok("les sous-techniques sont indexées avec les parentes",
+       d.subTechniques.every(t => d.allTechniqueById.get(t.id) === t)
+       && d.allTechniqueById.size === d.techniques.length + d.subTechniques.length);
+    ok("la couverture se déduit des rattachements des mitigations",
+       [...d.coverage].every(([techId, mits]) =>
+           [...mits].every(mId => d.mitigationById.get(mId).techniques
+               .some(cible => String(cible).split(".")[0] === techId))));
+    ok("une couverture visant une sous-technique remonte à la parente",
+       d.coverage.get("T1078")?.has("M1032"));
+    ok("les techniques non couvertes sont comptées",
+       d.counts.uncovered === d.techniques.filter(t => !d.coverage.has(t.id)).length);
+    ok("chaque tactique a sa colonne", d.byTactic.size === d.tactics.length);
+}
 
 /* --------------------------------------- robustesse à un HTML plus ancien */
 
@@ -833,8 +872,8 @@ console.log("\n[20] Un HTML en cache ne doit pas casser le chargement");
 
     let thrown = null;
     try {
-        const { loadAttack: load } = await import(`${ROOT}/js/attack.js?stale`);
-        const { $: sel } = await import(`${ROOT}/js/ui.js?stale`);
+        const { loadAttack: load } = await import(`${APP}/js/attack.js?stale`);
+        const { $: sel } = await import(`${APP}/js/ui.js?stale`);
         // Même rapport d'avancement que dans main.js, sur un DOM incomplet.
         const data = await load((msg, ratio) => {
             const status = sel("#boot-status");
@@ -955,7 +994,7 @@ ok("la dépendance n'encombre plus la question",
 /* ------------------------------------------------ passe de relecture */
 
 console.log("\n[22] Passe de relecture après un questionnaire complet");
-const { reviewTarget, acquiredMitigations } = await import(`${ROOT}/js/layer.js`);
+const { reviewTarget, acquiredMitigations } = await import(`${APP}/js/layer.js`);
 const ids = [...CATALOG.keys()];
 
 // Tout traité : les deux premières acquises, la troisième bloquée sur un « Non ».
@@ -1062,7 +1101,7 @@ ok("« .cell.sub » ne fixe pas d'opacité",
 /* --------------------------------------- questions communes à des mitigations */
 
 console.log("\n[24] Questions communes à plusieurs mitigations");
-const shared = await import(`${ROOT}/js/shared-questions.js`);
+const shared = await import(`${APP}/js/shared-questions.js`);
 const { SHARED_GROUPS, groupOf, primaryOf, sharedText, sharedWith, savedQuestions } = shared;
 
 // Chaque groupe doit désigner des questions qui existent, et son porteur doit
@@ -1241,8 +1280,8 @@ ok("M1027 Q2 reste séparée de M1018 Q2", groupOf("M1027", 2) === null);
 
 console.log("\n[24b] Une question commune n'est jamais reposée");
 {
-    const { answeredElsewhere } = await import(`${ROOT}/js/shared-questions.js`);
-    const { sanitiseAnswers } = await import(`${ROOT}/js/layer.js`);
+    const { answeredElsewhere } = await import(`${APP}/js/shared-questions.js`);
+    const { sanitiseAnswers } = await import(`${APP}/js/layer.js`);
 
     const l = createLayer({ name: "doublons" });
     setAnswer(l, "M1033", 1, { value: "Oui" });     // groupe M1033 Q1 / M1038 Q1
@@ -1326,7 +1365,7 @@ window.document.getElementById("brand").click();
 {
     const home = window.document.getElementById("view-home");
     // Les mêmes données normalisées que celles servies à l'application.
-    const data = await (await import(`${ROOT}/js/attack.js`)).loadAttack();
+    const data = await (await import(`${APP}/js/attack.js`)).loadAttack();
     const homeCss = readFileSync(`${ROOT}/css/home.css`, "utf8");
 
     // La rosace porte les tactiques, pas les mitigations : c'est l'axe de
@@ -1457,7 +1496,7 @@ window.document.getElementById("brand").click();
     // couronne. On rejoue donc le rendu sur les quinze noms réels — le cas que
     // l'utilisateur a sous les yeux, et le seul où la place manque vraiment.
     {
-        const { rosace } = await import(`${ROOT}/js/views/home-visuals.js`);
+        const { rosace } = await import(`${APP}/js/views/home-visuals.js`);
         const reelles = ["Reconnaissance", "Resource Development", "Initial Access",
             "Execution", "Persistence", "Privilege Escalation", "Stealth",
             "Defense Impairment", "Credential Access", "Discovery", "Lateral Movement",
@@ -2034,8 +2073,8 @@ console.log("\n[31] Le CSS servi est apparié au document qui le demande");
 
 console.log("\n[32] Mise en forme du classeur");
 {
-    const { RAMPE } = await import(`${ROOT}/js/excel.js`);
-    const { ANSWERS: REPONSES, LEVEL_LABELS: PALIERS } = await import(`${ROOT}/js/catalog.js`);
+    const { RAMPE } = await import(`${APP}/js/excel.js`);
+    const { ANSWERS: REPONSES, LEVEL_LABELS: PALIERS } = await import(`${APP}/js/catalog.js`);
     const FEUILLE_REPONSES = "Réponses";
 
     // La rampe du classeur doit être celle du thème clair : un classeur a un fond
@@ -2366,54 +2405,54 @@ console.log("\n[32] Mise en forme du classeur");
        /chargement \?\?=/.test(excelSrc) && /cdnjs[^"]*exceljs/.test(excelSrc));
 }
 
-console.log("\n[33] La jauge de chargement selon ce que le serveur annonce");
+console.log("\n[33] Le fichier de données généré");
 {
-    const { loadAttack } = await import(`${ROOT}/js/attack.js`);
-    const reseau = globalThis.fetch;
+    /* Le référentiel n'est plus téléchargé : il est commité. Ce fichier devient
+       donc du code publié comme un autre, et rien ne le relit au démarrage pour
+       s'apercevoir qu'il est vide, tronqué ou d'une autre forme. Ces assertions
+       sont le seul filet. */
+    const genere = readFileSync(`${ROOT}/js/attack-data.js`, "utf8");
+    ok("le fichier généré est présent", genere.length > 0);
+    ok("il porte l'avertissement de non-modification", /ne pas modifier à la main/.test(genere));
 
-    // Rejoue un chargement complet en décidant de ce que le serveur annonce.
-    // Derrière un proxy d'entreprise, `content-length` disparaît : le transfert
-    // se déroule normalement mais aucune taille ne permet de viser. La jauge
-    // restait alors figée à 0 % du début à la fin — un téléchargement qui avance
-    // derrière une barre morte se lit comme un blocage, et c'est ce qui a été
-    // rapporté depuis un poste d'entreprise.
-    const rejouer = async annonce => {
-        const rapports = [];
-        globalThis.fetch = async (url, opts) => {
-            const resp = await reseau(url, opts);
-            if (String(url).includes("index.json")) return resp;
-            return { ...resp, headers: { get: n => (n === "content-length" ? annonce : null) } };
-        };
-        try { await loadAttack((msg, ratio) => rapports.push({ msg, ratio })); }
-        finally { globalThis.fetch = reseau; }
-        return rapports;
-    };
+    /* Les données sont posées en JSON dans une chaîne plutôt qu'en littéral
+       d'objet : `JSON.parse` est nettement plus rapide que l'analyse syntaxique
+       du même contenu écrit en JavaScript, et sur plus d'un mégaoctet ça se voit
+       au démarrage. Si quelqu'un régénère autrement, ce gain part en silence. */
+    ok("les données passent par JSON.parse", /export default JSON\.parse\('/.test(genere));
 
-    const avec = await rejouer("4096");
-    ok("taille annoncée : la jauge est pilotée pendant le transfert",
-       avec.some(r => r.ratio !== undefined && r.ratio > 0 && r.ratio < 1),
-       avec.filter(r => r.ratio !== undefined).map(r => r.ratio.toFixed(2)).join(", "));
+    const reel = (await import(`${ROOT}/js/attack-data.js`)).default;
+    ok("la version est renseignée", /^\d+\.\d+$/.test(String(reel.version)), String(reel.version));
+    ok("les tactiques sont là", reel.tactics.length >= 10, String(reel.tactics.length));
+    ok("les techniques parentes sont là", reel.techniques.length >= 150, String(reel.techniques.length));
+    ok("les mitigations sont là", reel.mitigations.length >= 30, String(reel.mitigations.length));
+    ok("des rattachements mitigation -> technique existent",
+       reel.mitigations.reduce((n, m) => n + m.techniques.length, 0) >= 500);
 
-    const sans = await rejouer(null);
-    // Le rapport final annonce bien 100 % : ce qui compte est ce qui se passe
-    // *pendant*, quand la barre doit rester en va-et-vient.
-    const pendant = sans.filter(r => /Mo lus|téléchargement…/.test(r.msg));
-    ok("taille inconnue : aucun ratio n'est annoncé pendant le transfert",
-       pendant.every(r => r.ratio === undefined),
-       pendant.map(r => `${r.msg.slice(0, 34)}=${r.ratio}`).join(" | "));
-    ok("le compteur d'octets continue pourtant d'avancer",
-       pendant.some(r => /Mo lus/.test(r.msg)),
-       pendant.map(r => r.msg).at(-1));
-    ok("aucun rapport ne fige la jauge à zéro avant de savoir la remplir",
-       !sans.some(r => r.ratio === 0) && !avec.some((r, i) => r.ratio === 0 && i === 0),
-       sans.map(r => r.ratio).join(","));
+    /* La réduction ne doit rien laisser passer d'inutile : c'est tout l'intérêt
+       de l'opération, et une régression du générateur se verrait d'abord ici. */
+    const champsTechnique = new Set(reel.techniques.flatMap(t => Object.keys(t)));
+    ok("aucun champ inattendu sur les techniques",
+       [...champsTechnique].every(c => ["stixId", "id", "name", "description", "url",
+                                        "platforms", "tactics", "isSub", "subs"].includes(c)),
+       [...champsTechnique].join(", "));
 
-    // La jauge doit repasser en va-et-vient quand le ratio se tait, sinon elle
-    // garde l'état pris au premier rapport et reste immobile.
-    const mainSrc = readFileSync(`${ROOT}/js/main.js`, "utf8");
-    ok("et l'affichage repasse en indéterminé quand le ratio se tait",
-       /ratio === undefined[\s\S]{0,220}classList\.remove\("determinate"\)/.test(mainSrc));
+    /* Le poids est la raison d'être de tout ceci. Derrière un proxy qui
+       décompresse, c'est la taille brute qui est transférée : 53,8 Mo avant,
+       ~1,3 Mo maintenant. Le seuil laisse de la marge pour la croissance normale
+       du référentiel, mais pas pour un retour au bundle complet. */
+    ok("le fichier reste petit", genere.length < 4 * 1024 * 1024,
+       `${(genere.length / 1048576).toFixed(2)} Mo`);
+
+    /* Et il doit être à jour de son générateur : régénérer doit rendre le même
+       fichier, sinon le dépôt porte une sortie qui ne correspond plus au code
+       qui la produit. On rejoue la réduction sur le mini-bundle, où le résultat
+       est connu, plutôt que de retélécharger 54 Mo à chaque exécution. */
+    const rejoue = reduire(bundle, RELEASE);
+    ok("le générateur est déterministe",
+       JSON.stringify(rejoue) === JSON.stringify(DONNEES));
 }
+
 
 console.log("\n[34] Le fichier exporté porte l'organisation");
 {
@@ -2480,8 +2519,8 @@ console.log("\n[35] Ce qui a été retiré du questionnaire");
 
 console.log("\n[35b] Ce que la question n'affiche plus, et ce qu'elle propose");
 {
-    const { needsTool } = await import(`${ROOT}/js/tool-questions.js`);
-    const { QUESTIONNAIRES: QS } = await import(`${ROOT}/js/catalog.js`);
+    const { needsTool } = await import(`${APP}/js/tool-questions.js`);
+    const { QUESTIONNAIRES: QS } = await import(`${APP}/js/catalog.js`);
 
     window.document.getElementById("brand").click();
     window.document.getElementById("home-new").click();
@@ -2610,10 +2649,10 @@ console.log("\n[35b] Ce que la question n'affiche plus, et ce qu'elle propose");
 
 console.log("\n[35c] Le tableau de bord");
 {
-    const { CATALOG: CATA } = await import(`${ROOT}/js/catalog.js`);
-    const { createLayer, setAnswer, toJSON: enJSON, fromJSON: depuisJSON } = await import(`${ROOT}/js/layer.js`);
-    const { buildMatrixScores, tacticLevels } = await import(`${ROOT}/js/scoring.js`);
-    const donnees = await (await import(`${ROOT}/js/attack.js`)).loadAttack();
+    const { CATALOG: CATA } = await import(`${APP}/js/catalog.js`);
+    const { createLayer, setAnswer, toJSON: enJSON, fromJSON: depuisJSON } = await import(`${APP}/js/layer.js`);
+    const { buildMatrixScores, tacticLevels } = await import(`${APP}/js/scoring.js`);
+    const donnees = await (await import(`${APP}/js/attack.js`)).loadAttack();
 
     // Un layer où une seule mitigation est notée : de quoi distinguer une
     // tactique mesurée d'une tactique qui ne l'est pas.
@@ -2666,7 +2705,7 @@ console.log("\n[35c] Le tableau de bord");
            [...aucun.values()].every(v => v === null),
            [...aucun.values()].join(", "));
 
-        const { rosace } = await import(`${ROOT}/js/views/home-visuals.js`);
+        const { rosace } = await import(`${APP}/js/views/home-visuals.js`);
         const bac = window.document.createElement("div");
         bac.innerHTML = rosace(donnees, aucun);
         ok("leurs sommets se distinguent d'un zéro sur la rosace",
@@ -2812,7 +2851,7 @@ console.log("\n[35c] Le tableau de bord");
 
     /* --- exporter la rosace --- */
 
-    const { rosaceAutonome } = await import(`${ROOT}/js/views/home-visuals.js`);
+    const { rosaceAutonome } = await import(`${APP}/js/views/home-visuals.js`);
     window.document.querySelector('[data-expand="rosace"]').click();
     ok("l'export n'est proposé que sur la rosace agrandie",
        /#dash\[data-expanded="rosace"\] \.rosace-export\s*\{\s*display:\s*inline-flex/.test(matrixCss) &&
@@ -2875,69 +2914,18 @@ console.log("\n[35d] Pas de liseré d'accent à gauche des blocs");
        liserets.join(" · ") || "aucun");
 }
 
-console.log("\n[36] Un téléchargement qui échoue est retenté");
-{
-    const { loadAttack } = await import(`${ROOT}/js/attack.js`);
-    const reseau = globalThis.fetch;
+/* [36] « Un téléchargement qui échoue est retenté » a été retiré : il n'y a plus
+   de téléchargement. La stratégie de reprise qu'il éprouvait — premier essai sur
+   le cache, suivants en `reload`, trois essais puis abandon — existait pour
+   survivre aux 400 de GitHub sur le plus gros fichier du dépôt et aux entrées de
+   cache fautives. Les deux disparaissent avec le fetch lui-même ; ce que le banc
+   surveille désormais à la place, c'est qu'aucune requête ne parte au démarrage
+   (voir [1]) et que le fichier embarqué soit valide (voir [33]). */
 
-    const BUNDLE = "https://exemple.invalid/enterprise-attack-19.2.json";
-    const INDEX = JSON.stringify({
-        collections: [{
-            name: "Enterprise ATT&CK",
-            versions: [{ version: "19.2", url: BUNDLE, modified: "2026-08-20T00:00:00.000Z" }],
-        }],
-    });
-
-    // Rejoue un chargement en décidant du sort des premiers essais sur le
-    // bundle. Aucun octet ne part sur le réseau : seule la stratégie de reprise
-    // est en cause ici.
-    const rejouer = async echecs => {
-        const essais = [];
-        globalThis.fetch = async (url, opts) => {
-            if (String(url).includes("index.json")) return new Response(INDEX, { status: 200 });
-            essais.push(opts?.cache);
-            return essais.length <= echecs
-                ? new Response("400: Bad Request", { status: 400 })
-                : new Response(JSON.stringify({ objects: [] }), { status: 200 });
-        };
-        const rapports = [];
-        try {
-            const data = await loadAttack(msg => rapports.push(msg));
-            return { essais, rapports, data };
-        } catch (err) {
-            return { essais, rapports, err };
-        } finally { globalThis.fetch = reseau; }
-    };
-
-    // Le cas rapporté : GitHub répond 400 sur le plus gros fichier du dépôt
-    // quand un nœud de diffusion doit le chercher à froid. Un seul échec
-    // condamnait tout le chargement.
-    const passager = await rejouer(1);
-    ok("un 400 au premier essai ne condamne plus le chargement",
-       !passager.err && passager.data?.version === "19.2", passager.err?.message);
-    ok("l'utilisateur voit qu'un nouvel essai a lieu",
-       passager.rapports.some(m => /nouvel essai/.test(m)));
-
-    // L'autre cause : `force-cache` rejoue une entrée fautive du navigateur sans
-    // jamais la revalider — la page échoue en navigation normale et fonctionne
-    // en navigation privée, sur la même machine et le même réseau. Les essais
-    // suivants doivent donc court-circuiter le cache.
-    ok("le premier essai accepte le cache, les suivants l'écartent",
-       passager.essais[0] === "force-cache" && passager.essais.slice(1).every(c => c === "reload"),
-       passager.essais.join(" → "));
-
-    // Réessayer sans fin masquerait une panne réelle derrière une jauge qui
-    // tourne : l'erreur doit finir par remonter, telle quelle.
-    const durable = await rejouer(Infinity);
-    ok("une panne durable finit par être annoncée", /HTTP 400/.test(durable.err?.message ?? ""),
-       durable.err?.message);
-    ok("et elle n'est pas retentée indéfiniment", durable.essais.length === 3,
-       `${durable.essais.length} essais`);
-}
 
 console.log("\n[37] Ce qui vient d'un fichier ne devient jamais une clé sans être reconnu");
 {
-    const { sanitiseAnswers } = await import(`${ROOT}/js/layer.js`);
+    const { sanitiseAnswers } = await import(`${APP}/js/layer.js`);
 
     /* Un layer se transporte par fichier, et un fichier se fabrique à la main.
 
@@ -3040,14 +3028,20 @@ console.log("\n[38b] Politique de sécurité du contenu");
     ok("les objets et la base d'URL sont fermés",
        directive("object-src") === "'none'" && directive("base-uri") === "'none'");
     ok("aucun formulaire ne peut être soumis nulle part", directive("form-action") === "'none'");
-    /* Les données ATT&CK sont la seule destination réseau légitime — et la
-       politique doit désigner exactement l'hôte que le code interroge. Les deux
-       sont écrits à deux endroits différents : si l'un bouge sans l'autre, la
-       page ne charge plus rien et l'erreur ressemble à une panne réseau. */
-    const hote = new URL(/INDEX_URL = "([^"]+)"/.exec(
-        readFileSync(`${ROOT}/js/attack.js`, "utf8"))[1]).origin;
-    ok("le réseau est limité à la source des données",
-       directive("connect-src") === hote, `${directive("connect-src")} / attack.js vise ${hote}`);
+    /* Depuis que le référentiel est généré et embarqué, la page ne fait plus
+       aucune requête de son propre chef : `connect-src` peut donc être fermé,
+       et c'est la position la plus sûre — une injection qui parviendrait à
+       s'exécuter n'aurait aucune destination vers laquelle exfiltrer. La
+       directive et le code doivent rester d'accord : si un `fetch` réapparaît
+       sans que la politique bouge, la page échoue au chargement avec une erreur
+       qui ressemble à une panne réseau. */
+    ok("aucune destination réseau n'est autorisée",
+       directive("connect-src") === "'none'", directive("connect-src"));
+    const sourcesJs = readdirSync(`${ROOT}/js`, { recursive: true })
+        .filter(f => String(f).endsWith(".js") && String(f) !== "attack-data.js");
+    const quiFetch = sourcesJs.filter(f =>
+        /\bfetch\s*\(|XMLHttpRequest|navigator\.sendBeacon/.test(readFileSync(`${ROOT}/js/${f}`, "utf8")));
+    ok("et aucun module ne tente de sortir sur le réseau", quiFetch.length === 0, quiFetch.join(", "));
 
     /* Les empreintes sont recalculées ici sur le contenu réel des scripts en
        ligne. C'est le point qui se périme tout seul : modifier un de ces scripts
