@@ -237,11 +237,53 @@
     }
 }
 
+/* ------------------------------------------------- le tableau de bord au doigt
+
+   En colonne, quatre blocs empilés dans l'ordre où l'on s'en sert, et chacun
+   porte sa hauteur.
+
+   C'est ce dernier point qui manquait. Les trois panneaux de gauche étaient
+   emballés dans `#dash-side`, un seul élément de grille : la matrice réclamait
+   60 vh, `#dash-side` prenait ce qui restait, et ses trois panneaux se
+   partageaient un reste qui n'existait pas. Les trois se réduisaient à leur
+   titre — rosace, mitigations et CVE disparaissaient purement et simplement.
+
+   `display: contents` dissout l'emballage : les trois panneaux deviennent des
+   blocs de la page au même titre que la matrice, et chacun peut recevoir sa
+   hauteur. L'ordre se règle alors un par un, et la matrice remonte en tête :
+   c'est elle qu'on vient voir, et c'est la seule que sa largeur oblige à faire
+   défiler. Le mode agrandi continue de masquer ce qu'il masquait, sa règle étant
+   plus spécifique que celle-ci. */
 @media (max-width: 900px) {
-    #dash { grid-template-columns: minmax(0, 1fr); overflow-y: auto; }
-    #dash-side { grid-template-rows: auto auto auto; }
-    [data-panel="mitigations"] .panel-body { max-height: 320px; }
-    [data-panel="matrix"] { min-height: 60vh; }
+    /* Une pile, et non plus une grille d'une colonne.
+
+       La grille ne pouvait pas marcher ici, et pour une raison qui ne se voit
+       pas : un panneau porte `overflow: hidden`, ce qui met sa taille minimale
+       automatique à zéro. Les rangées `auto` d'une grille de hauteur définie
+       peuvent donc être comprimées jusqu'à rien, et c'est ce qui arrivait — la
+       rosace mesurait 61 px pour un dessin de 343. En pile, chaque panneau prend
+       sa hauteur de contenu et c'est la page qui défile. */
+    #dash {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        overflow-y: auto;
+    }
+    #dash-side { display: contents; }
+    #dash .dash-panel { flex: 0 0 auto; }
+
+    [data-panel="matrix"] { order: -1; height: 70vh; }
+
+    /* La rosace prend la largeur du bloc, et reste dedans : c'est le même
+       échange que sur l'accueil, où elle remplace la matrice sur un écran
+       étroit. Le plafond en `vh` des écrans peu hauts ne s'applique plus, il
+       n'a de sens qu'en colonne latérale. */
+    .dash-panel[data-panel="rosace"] .rosace { width: 100%; height: auto; max-height: none; }
+
+    /* Cinq lignes visibles et la sixième amorcée : la liste se voit défiler
+       sans qu'on ait à le deviner. Une liste de quarante-quatre mitigations
+       déroulée en entier ferait de la page un couloir. */
+    [data-panel="mitigations"] .panel-body { max-height: 236px; overflow-y: auto; }
 }
 
 /* ------------------------------------------------------------- barre d'outils */
@@ -416,20 +458,31 @@
 .tactic-head .t-bar { display: none; }
 #matrix-grid.fit .tactic-head .t-bar { display: block; }
 
-#matrix-grid:not(.fit) .tactic-head {
-    height: 50px;
-    min-height: 0;
-    padding: 4px 5px;
-}
-#matrix-grid:not(.fit) .tactic-head .t-name {
+/* La hauteur est fixée dans les deux modes, jamais minimale, et le nom est bridé
+   à deux lignes. « Resource Development » passe à la ligne là où « Execution »
+   tient sur une : avec une hauteur minimale, l'en-tête le plus haut décalait sa
+   colonne entière vers le bas et les rangées ne s'alignaient plus d'une colonne
+   à l'autre — ce qui est précisément ce qu'on demande à une matrice.
+
+   Deux valeurs parce que le plein écran porte en plus la barre d'avancement, qui
+   demande ses neuf pixels. */
+.tactic-head .t-name {
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
-    /* Un cran plus petit qu'en plein écran : « Reconnaissance » se coupait en
-       plein mot dans une colonne de 96 px, faute d'y tenir sur une ligne. */
-    font-size: 0.63rem;
 }
+
+#matrix-grid:not(.fit) .tactic-head { height: 50px; padding: 4px 5px; }
+/* Un cran plus petit qu'en plein écran : « Reconnaissance » se coupait en plein
+   mot dans une colonne de 96 px, faute d'y tenir sur une ligne. */
+#matrix-grid:not(.fit) .tactic-head .t-name { font-size: 0.63rem; }
+
+#matrix-grid.fit .tactic-head { height: 58px; }
+/* Quinze colonnes sur une largeur de fenêtre laissent environ 86 px utiles par
+   en-tête. « Reconnaissance » y demandait deux pixels de trop et se coupait en
+   plein mot, ce qui est la seule coupure qu'on ne pardonne pas à un titre. */
+#matrix-grid.fit .tactic-head .t-name { font-size: 0.64rem; }
 
 .tactic-col { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 
@@ -443,12 +496,10 @@
 }
 .tactic-col.picked .tactic-head .t-name { color: var(--accent); }
 
-/* Hauteur commune à tous les en-têtes.
-   « Resource Development » passe à la ligne là où « Execution » tient sur une :
-   l'en-tête devenait plus haut que ses voisins et décalait toute sa colonne
-   vers le bas, si bien que les cases ne s'alignaient plus d'une colonne à
-   l'autre. Une hauteur unique, avec le nom centré dedans, aligne les rangées
-   quel que soit le nombre de lignes du titre. */
+/* Forme commune aux en-têtes. La hauteur, elle, est fixée plus bas et dépend du
+   mode : le plein écran porte en plus la barre d'avancement. Elle n'est pas
+   posée ici en valeur minimale — c'était le cas, et cela laissait « Resource
+   Development » pousser sa colonne d'une ligne de plus que ses voisines. */
 .tactic-head {
     position: sticky;
     top: 0;
@@ -456,7 +507,6 @@
     display: flex;
     flex-direction: column;
     justify-content: center;
-    min-height: 44px;
     background: var(--surface-3);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm) var(--radius-sm) 0 0;

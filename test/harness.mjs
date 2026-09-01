@@ -3342,6 +3342,83 @@ console.log("\n[41] Le mouvement, et ce qui le coupe");
     }
 }
 
+console.log("\n[42] Hauteurs d'en-tête, retour à l'accueil, tableau de bord au doigt");
+{
+    const matrixCss = readFileSync(`${ROOT}/css/matrix.css`, "utf8");
+    const homeCss = readFileSync(`${ROOT}/css/home.css`, "utf8");
+    const mainJs = readFileSync(`${ROOT}/js/main.js`, "utf8");
+
+    /* --- les en-têtes de tactique ---
+
+       Hauteur fixée dans les deux modes, jamais minimale. Avec une hauteur
+       minimale, « Resource Development » passait à la ligne là où « Execution »
+       tenait sur une, l'en-tête le plus haut décalait sa colonne entière, et les
+       rangées ne s'alignaient plus d'une colonne à l'autre. */
+    for (const [mode, motif] of [
+        ["fenêtré", /#matrix-grid:not\(\.fit\) \.tactic-head\s*\{[^}]*height:\s*\d+px/],
+        ["plein écran", /#matrix-grid\.fit \.tactic-head\s*\{[^}]*height:\s*\d+px/],
+    ]) {
+        ok(`en ${mode}, tous les en-têtes ont la même hauteur`, motif.test(matrixCss));
+    }
+    ok("aucun ne garde de hauteur minimale, qui les laisserait diverger",
+       !/\.tactic-head\s*\{[^}]*min-height:\s*[1-9]/.test(matrixCss));
+    ok("le nom est bridé à deux lignes",
+       /\.tactic-head \.t-name\s*\{[^}]*-webkit-line-clamp:\s*2/.test(matrixCss));
+    // La barre d'avancement n'existe qu'en plein écran : en fenêtré, quinze
+    // traits sous quinze titres font une frange qui tire l'oeil hors des cases.
+    ok("la barre d'avancement n'apparaît qu'en plein écran",
+       /\.tactic-head \.t-bar\s*\{\s*display:\s*none/.test(matrixCss) &&
+       /#matrix-grid\.fit \.tactic-head \.t-bar\s*\{\s*display:\s*block/.test(matrixCss));
+
+    /* --- on revient toujours en haut de l'accueil --- */
+
+    // La vue n'est pas détruite en la quittant, elle est masquée : elle gardait
+    // donc sa position, et revenir d'un questionnaire rouvrait la page au milieu
+    // de la FAQ sans que rien ne l'ait demandé.
+    ok("le retour à l'accueil remet la page en haut",
+       /#view-home[\s\S]{0,120}scrollTo[\s\S]{0,80}top:\s*0/.test(mainJs));
+    ok("et il le fait sans animer la remontée",
+       /scrollTo\?\.\(\{ top: 0, behavior: "instant" \}\)/.test(mainJs));
+
+    /* --- l'accueil au doigt --- */
+
+    const petit = /@media\s*\(max-width:\s*700px\)\s*\{([\s\S]*?)\n\}/.exec(homeCss)?.[1] ?? "";
+    const basDeHero = Number(/\.hero\s*\{[^}]*padding-bottom:\s*(\d+)px/.exec(petit)?.[1] ?? 0);
+    // La bande change de couleur juste sous les chiffres : il faut sentir la fin
+    // d'un bloc avant de voir le début du suivant.
+    ok("les chiffres ne touchent pas la limite de la bande", basDeHero >= 64, `${basDeHero}px`);
+
+    /* --- le tableau de bord au doigt ---
+
+       En colonne, quatre blocs empilés dans l'ordre où l'on s'en sert. Une
+       grille ne pouvait pas le faire : un panneau porte `overflow: hidden`, donc
+       sa taille minimale automatique vaut zéro, et les rangées `auto` d'une
+       grille de hauteur définie se comprimaient jusqu'à rien — la rosace, les
+       mitigations et le bloc CVE se réduisaient à leur titre. */
+    const doigt = /@media\s*\(max-width:\s*900px\)\s*\{([\s\S]*?)\n\}/.exec(matrixCss)?.[1] ?? "";
+    ok("les panneaux s'empilent au lieu de se partager une grille",
+       /#dash\s*\{[^}]*display:\s*flex/.test(doigt) &&
+       /#dash \.dash-panel\s*\{[^}]*flex:\s*0 0 auto/.test(doigt),
+       doigt.replace(/\s+/g, " ").slice(0, 110));
+    ok("l'emballage de la colonne de gauche se dissout, pour qu'on puisse les ordonner",
+       /#dash-side\s*\{\s*display:\s*contents/.test(doigt));
+    ok("la matrice passe en tête",
+       /\[data-panel="matrix"\]\s*\{[^}]*order:\s*-1/.test(doigt));
+    ok("la rosace prend la largeur de son bloc",
+       /\[data-panel="rosace"\] \.rosace\s*\{[^}]*width:\s*100%/.test(doigt));
+    // Une liste de quarante-quatre mitigations déroulée en entier ferait de la
+    // page un couloir : on en montre cinq, et la sixième amorcée dit qu'il y en a.
+    const hauteurListe = Number(/\[data-panel="mitigations"\] \.panel-body\s*\{[^}]*max-height:\s*(\d+)px/.exec(doigt)?.[1] ?? 0);
+    ok("la liste des mitigations est bornée et défile",
+       hauteurListe > 0 && hauteurListe < 320 &&
+       /\[data-panel="mitigations"\] \.panel-body\s*\{[^}]*overflow-y:\s*auto/.test(doigt),
+       `${hauteurListe}px`);
+    // Le mode agrandi doit continuer de masquer ce qu'il masque : sa règle est
+    // plus spécifique que `#dash-side { display: contents }`.
+    ok("le mode agrandi reste prioritaire sur la dissolution",
+       /#dash\[data-expanded="matrix"\] #dash-side,[\s\S]{0,200}display:\s*none/.test(matrixCss));
+}
+
 console.log("\n[40] Aucun tiret cadratin dans ce que l'utilisateur lit");
 {
     /* Décision de cadrage, pas de goût : le tiret cadratin est banni des chaînes

@@ -933,7 +933,10 @@
 
     .hero-matrix { display: none; }
 
-    .hero { padding-top: 88px; padding-bottom: 40px; gap: 0; }
+    /* La bande change de couleur juste sous les chiffres. À 40 px, la limite
+       arrivait dans la foulée du texte et se lisait comme une coupure ; il faut
+       qu'on sente la fin d'un bloc avant de voir le début du suivant. */
+    .hero { padding-top: 88px; padding-bottom: 72px; gap: 0; }
     .hero-copy { align-items: center; text-align: center; }
     .hero-lead { margin-left: auto; margin-right: auto; }
     .hero-cta { width: 100%; justify-content: center; }

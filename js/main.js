@@ -53,8 +53,20 @@ const app = {
         // sait les câbler. Ailleurs, ils désigneraient l'écran qu'on regarde.
         if (name !== "matrix") $("#topbar-actions")?.classList.add("hidden");
 
-        if (name === "home") { renderHome(this); spySections(); }
-        else arreterVisuels();
+        if (name === "home") {
+            renderHome(this);
+            // On revient toujours en haut de l'accueil. La vue n'est pas
+            // détruite en la quittant, elle est masquée : elle gardait donc sa
+            // position de défilement, et revenir d'un questionnaire rouvrait la
+            // page au milieu de la FAQ, sans que rien ne l'ait demandé.
+            // « Instantané » et non adouci : la feuille de style anime le
+            // défilement pour les ancres, et on verrait la page remonter toute
+            // seule pendant une seconde.
+            $("#view-home")?.scrollTo?.({ top: 0, behavior: "instant" });
+            spySections();
+        } else {
+            arreterVisuels();
+        }
         if (name === "matrix") renderMatrix(this);
         if (name === "quiz") renderQuiz(this, options);
 
