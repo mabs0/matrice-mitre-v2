@@ -1,3 +1,11 @@
+# Réglages locaux de l'agent, et ses fichiers d'écriture atomique. Le dossier
+# entier, pas le seul `settings.local.json` : un temporaire nommé
+# `settings.local.json.tmp.8147.f81faf2c72c3` s'est retrouvé publié dans
+# l'historique parce que la règle visait le nom exact. Cette protection vivait
+# jusqu'ici dans l'ignore global de la machine — donc absente d'un clone fait
+# ailleurs, et absente pour qui reprendrait le dépôt.
+.claude/
+
 # Documents de travail internes (roadmap DIFFUSION RESTREINTE, relecture CLUSIF nominative, sources Excel/Word/PowerPoint)
 docs/
 
