@@ -112,6 +112,29 @@ const DONNEES = reduire(bundle, RELEASE);
 writeFileSync(`${APP}/js/attack-data.js`,
               `export default ${JSON.stringify(DONNEES)};\n`);
 
+/* La table des CVE subit le même traitement que le référentiel : la vraie pèse
+   1,7 Mo et cite 191 techniques dont aucune n'existe dans le mini-bundle
+   ci-dessus, donc un surlignage n'y allumerait rien et les assertions ne
+   prouveraient rien. On en écrit une minuscule, dans le format exact que produit
+   `tools/build-cve.mjs`, sur les techniques que la matrice d'essai connaît.
+
+   Les deux CVE choisies sont réelles — Log4Shell et sa suivante —, seuls les
+   rattachements sont synthétiques. Un identifiant inventé se serait glissé dans
+   une capture d'écran un jour ou l'autre. */
+const CVE_ESSAI = {
+    generated: "2026-09-02T00:00:00.000Z",
+    cwe: "4.20",
+    counts: { read: 2, indexed: 2, sets: 2, techniques: 4 },
+    techniques: ["T1078", "T1078.001", "T1110", "T1555"],
+    sets: [
+        [[0, 1], [2]],      // CVE-2021-44228 : deux directes, une héritée
+        [[], [3]],          // CVE-2021-45046 : rien en direct, une héritée
+    ],
+    years: { 2021: { 0: [44228], 1: [45046] } },
+};
+writeFileSync(`${APP}/js/cve-data.js`,
+              `export default ${JSON.stringify(CVE_ESSAI)};\n`);
+
 /* ------------------------------------------------------------------- jsdom */
 
 const html = readFileSync(`${ROOT}/index.html`, "utf8")
@@ -3109,12 +3132,14 @@ console.log("\n[35c] Le tableau de bord");
        (/<rect[^>]*fill="([^"]*)"/.exec(fichier) ?? [])[1]);
     window.document.querySelector('[data-expand="rosace"]').click();
 
-    /* --- la recherche CVE, prévue mais pas branchée --- */
+    /* --- la recherche CVE --- */
 
+    // Le champ était un décor désactivé qui annonçait une source à brancher.
+    // Il est branché : voir la section [46] pour ce qu'il fait.
     const cve = window.document.getElementById("dash-cve");
-    ok("le champ CVE est présent mais désactivé", !!cve && cve.disabled);
-    ok("et il annonce la source sur laquelle il s'appuiera",
-       /CVE2CAPEC/.test(window.document.getElementById("dash-cve-note")?.textContent ?? ""));
+    ok("le champ CVE est actif", !!cve && !cve.disabled);
+    ok("et l'interrupteur des techniques héritées est à côté",
+       !!window.document.getElementById("cve-heritees"));
 }
 
 console.log("\n[35d] Pas de liseré d'accent à gauche des blocs");
@@ -3758,6 +3783,124 @@ console.log("\n[45] Reprendre une mitigation, et circuler dedans");
        rang() === "2" && choisie() === null, `Q${rang()} réponse ${choisie()}`);
     ok("la question 1, déjà répondue, reste accessible en arrière",
        !!window.document.getElementById("q-back"));
+}
+
+console.log("\n[46] Une CVE collée, des techniques allumées");
+{
+    const html = readFileSync(`${ROOT}/index.html`, "utf8");
+    const cveJs = readFileSync(`${ROOT}/js/cve.js`, "utf8");
+
+    /* --- l'architecture, avant le comportement ---
+
+       La table pèse 1,7 Mo. Si elle entrait dans le graphe de démarrage, tout le
+       monde la paierait pour une fonction que peu utilisent. Elle ne doit donc
+       être atteinte que par un `import()`, et jamais par un `import` en tête de
+       module — la différence entre les deux ne se voit pas à la lecture d'un
+       diff, d'où cette assertion. */
+    ok("la table des CVE n'est jamais importée statiquement",
+       !/^\s*import\s[^;]*["']\.\/cve-data\.js["']/m.test(cveJs) &&
+       /import\(\s*["']\.\/cve-data\.js["']\s*\)/.test(cveJs));
+    const sourcesAvecCve = ["js/main.js", "js/views/matrix.js"]
+        .filter(f => /cve-data/.test(readFileSync(`${ROOT}/${f}`, "utf8")));
+    ok("et aucun module du démarrage ne la nomme", sourcesAvecCve.length === 0,
+       sourcesAvecCve.join(", "));
+
+    /* Un `import()` de module local n'est pas une requête réseau : il relève de
+       `script-src`, que `strict-dynamic` ouvre à ce que les scripts de confiance
+       chargent eux-mêmes. C'est ce qui permet de garder `connect-src 'none'`. */
+    ok("la politique n'a pas eu besoin d'être rouverte pour autant",
+       /connect-src 'none'/.test(html));
+    ok("le fichier généré porte bien sa mise en garde de fraîcheur",
+       /à la première\s+CVE saisie/.test(readFileSync(`${ROOT}/js/cve-data.js`, "utf8").slice(0, 1200)));
+
+    /* --- la reconnaissance de la saisie --- */
+    const { normaliserCve } = await import(`${APP}/js/cve.js`);
+    for (const [saisie, attendu] of [
+        ["CVE-2021-44228", "CVE-2021-44228"],
+        ["cve-2021-44228", "CVE-2021-44228"],      // collé depuis un rapport en bas de casse
+        ["  CVE-2021-44228  ", "CVE-2021-44228"],  // collé depuis un tableur
+        ["cve 2021 44228", "CVE-2021-44228"],      // collé depuis un PDF
+        ["2021-44228", "CVE-2021-44228"],          // le préfixe va de soi
+        ["CVE-2021-0044228", "CVE-2021-44228"],    // zéros de tête
+        ["bonjour", null],
+        ["CVE-21-44228", null],
+        ["", null],
+    ]) {
+        ok(`« ${saisie} » ${attendu ? "vaut " + attendu : "n'est pas une CVE"}`,
+           normaliserCve(saisie) === attendu, String(normaliserCve(saisie)));
+    }
+
+    /* --- le comportement dans la page --- */
+    window.document.getElementById("brand").click();
+    window.document.getElementById("home-new").click();
+    window.document.getElementById("nl-ok").click();
+    window.document.getElementById("q-matrix").click();
+
+    const champ = window.document.getElementById("dash-cve");
+    const bouton = window.document.getElementById("cve-heritees");
+    const note = () => window.document.getElementById("dash-cve-note").textContent.replace(/\s+/g, " ").trim();
+    const classesDe = t => [...(window.document.querySelector(`[data-tech="${t}"]`)?.classList ?? [])];
+    const allumee = t => classesDe(t).includes("highlighted");
+    const eteinte = t => classesDe(t).includes("dimmed");
+    // Le champ est débattu : chaque frappe attend 220 ms avant de chercher.
+    const taper = async valeur => {
+        champ.value = valeur;
+        champ.dispatchEvent(new window.Event("input"));
+        await new Promise(r => setTimeout(r, 400));
+    };
+
+    ok("l'interrupteur des héritées est coupé au départ",
+       bouton.getAttribute("aria-pressed") === "false", bouton.getAttribute("aria-pressed"));
+
+    await taper("CVE-2021-44228");
+    ok("la CVE est reconnue et son bilan s'affiche", /CVE-2021-44228/.test(note()), note().slice(0, 60));
+    ok("les techniques directes s'allument", allumee("T1078"), classesDe("T1078").join(" "));
+    ok("les autres s'éteignent", eteinte("T1555"), classesDe("T1555").join(" "));
+    /* Le point qui compte : héritées coupées, T1110 ne doit pas être allumée.
+       C'est toute la différence entre « cette vulnérabilité permet ça » et
+       « cette famille de faiblesses permet ça ». */
+    ok("mais pas les héritées, puisque l'interrupteur est coupé",
+       eteinte("T1110"), classesDe("T1110").join(" "));
+    ok("le bilan dit combien il y en a de chaque sorte",
+       /2 directe/.test(note()) && /1 héritée/.test(note()), note().slice(0, 120));
+    ok("et jusqu'où va la table, pour qu'on ne la croie pas vivante",
+       /Table figée au/.test(note()), note().slice(-90));
+
+    bouton.click();
+    ok("l'interrupteur allume les héritées", allumee("T1110"), classesDe("T1110").join(" "));
+    ok("sans toucher aux directes", allumee("T1078"));
+    bouton.click();
+    ok("et les rééteint", eteinte("T1110"));
+
+    /* --- une CVE dont tout est hérité --- */
+    bouton.click();
+    await taper("CVE-2021-45046");
+    ok("une CVE sans lien direct n'allume rien tant que les héritées sont coupées ou non",
+       allumee("T1555"), classesDe("T1555").join(" "));
+    ok("son bilan annonce zéro direct", /0 directe/.test(note()), note().slice(0, 90));
+    bouton.click();
+
+    /* --- ce qui n'est pas trouvé --- */
+    await taper("CVE-2021-99999");
+    ok("une CVE absente de la table le dit", /Aucune technique connue/.test(note()), note().slice(0, 80));
+    ok("et n'allume rien", !allumee("T1078") && !eteinte("T1078"), classesDe("T1078").join(" "));
+
+    await taper("CVE-2030-12345");
+    ok("un millésime hors table donne un message différent",
+       /millésime 2030/.test(note()), note().slice(0, 80));
+
+    await taper("pas une cve");
+    ok("une saisie qui n'est pas une CVE ne casse rien et n'allume rien",
+       !allumee("T1078") && !eteinte("T1078"), classesDe("T1078").join(" "));
+
+    /* --- les trois mises en avant s'excluent --- */
+    await taper("CVE-2021-44228");
+    ok("la CVE surligne", allumee("T1078"));
+    const ligne = window.document.querySelector("[data-mitigation]");
+    ligne.click();
+    ok("cliquer une mitigation reprend la main sur le surlignage",
+       !/CVE-2021-44228/.test(note()), note().slice(0, 60));
+    ligne.click();
 }
 
 // Le nombre d'assertions est affiché plutôt que recopié dans le README, où il

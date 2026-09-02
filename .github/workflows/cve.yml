@@ -1,0 +1,70 @@
+# Régénère js/cve-data.js — la table « CVE -> techniques ATT&CK ».
+#
+# Pourquoi une action et non un bouton dans la page. Le site est un ensemble de
+# fichiers statiques servis par GitHub Pages : il n'y a pas de serveur derrière,
+# et la politique de sécurité de la page interdit toute sortie réseau
+# (`connect-src 'none'`). Un bouton dans le navigateur ne peut donc ni lancer un
+# script Node, ni télécharger les 217 Mo de flux du NVD, ni réécrire un fichier
+# du dépôt. Ce qui peut faire les trois, c'est ceci.
+#
+# Le bouton existe quand même : `workflow_dispatch` en pose un dans l'onglet
+# Actions du dépôt. « Run workflow », et la table est refaite.
+#
+# Le commit qui en sort déclenche pages.yml, donc la publication : entre le
+# déclenchement et la mise en ligne, il n'y a rien à faire à la main.
+#
+# Cadence. Mensuelle plutôt que quotidienne, pour deux raisons. Le fichier pèse
+# 1,7 Mo et il est réécrit en entier : le commettre tous les jours ferait grossir
+# l'historique du dépôt bien plus vite que ce que la fraîcheur apporte. Et une
+# CVE publiée ce matin n'a de toute façon pas encore de CWE attribué par le NIST
+# — l'attribution prend des jours, parfois des semaines. Rafraîchir plus vite que
+# la source ne rendrait rien de plus.
+
+name: Table CVE
+
+on:
+  schedule:
+    # Le 1er de chaque mois, à 3 h UTC.
+    - cron: "0 3 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cve-data
+  cancel-in-progress: false
+
+jobs:
+  regenerer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # Les flux annuels du NVD font 217 Mo au total, et le plus gros millésime
+      # dépasse les 300 Mo une fois décompressé en mémoire.
+      - name: Régénérer la table
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
+        run: node tools/build-cve.mjs
+
+      - name: Vérifier que le banc passe toujours
+        run: |
+          cd test
+          npm ci
+          npm test
+
+      # Rien n'est commis si la table n'a pas bougé : un commit vide chaque mois
+      # déclencherait une publication pour rien.
+      - name: Commettre si la table a changé
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add js/cve-data.js
+          git diff --staged --quiet && echo "table inchangée, rien à publier" && exit 0
+          git commit -m "Table CVE régénérée"
+          git push

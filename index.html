@@ -60,7 +60,7 @@
     -->
     <meta http-equiv="Content-Security-Policy" content="
         default-src 'none';
-        script-src 'strict-dynamic' 'sha256-uxt/S+gtwxhpEN9fqISjul5NApmZnTNWtTh92SsTBFY=' 'sha256-d/fJtFq9zFmdg4165lCUZprU20TIBX8xfGTwZN3XJYg=' 'self' https://cdnjs.cloudflare.com;
+        script-src 'strict-dynamic' 'sha256-ndisI0m5bCWXNz5rtajE0EEUNFg8XvyDFc/IEcTNGIY=' 'sha256-d/fJtFq9zFmdg4165lCUZprU20TIBX8xfGTwZN3XJYg=' 'self' https://cdnjs.cloudflare.com;
         style-src 'self' 'unsafe-inline';
         img-src 'self' data: blob:;
         connect-src 'none';
@@ -144,8 +144,8 @@
             && HTMLScriptElement.supports("importmap");
 
         var modules = [
-            "attack", "attack-data", "catalog", "crypto", "excel", "io", "layer", "main", "scoring",
-            "shared-questions", "theme", "tool-questions", "ui",
+            "attack", "attack-data", "catalog", "crypto", "cve", "cve-data", "excel", "io", "layer",
+            "main", "scoring", "shared-questions", "theme", "tool-questions", "ui",
             "views/home", "views/home-visuals", "views/matrix", "views/quiz",
         ];
         // Clés et valeurs en URL absolues. Une valeur relative doit commencer

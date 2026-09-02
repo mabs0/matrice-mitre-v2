@@ -23,6 +23,7 @@ import { resolvedEntries } from "../shared-questions.js";
 import { buildMatrixScores, mitigationLevels, tacticLevels, CELL_STATE, SCORING_MODES, AGGREGATION_MODES } from "../scoring.js";
 import { exportExcel, exportJSON, exportName } from "../io.js";
 import { rosace, rosaceAutonome } from "./home-visuals.js";
+import { techniquesDeCve, normaliserCve, perimetreCve } from "../cve.js";
 
 /** État de vue, volontairement hors du layer : ce n'est pas de la donnée d'évaluation. */
 const view = {
@@ -36,6 +37,17 @@ const view = {
        Choisir l'une éteint l'autre. */
     highlight: "",             // mitigation sélectionnée dans la liste
     tactic: "",                // tactique sélectionnée sur la rosace
+    /* Une CVE résolue met elle aussi la matrice en avant, et selon la même
+       grammaire. Elle est à part des deux précédentes parce qu'elle ne se
+       désigne pas d'un clic dans la page mais se colle dans un champ, et parce
+       qu'elle porte deux listes au lieu d'une. */
+    cve: null,                 // résultat de `techniquesDeCve`, ou null
+    cveEnCours: false,         // le fichier de données se charge
+    /* Réglage d'affichage, pas résultat de recherche : il survit d'une CVE à
+       l'autre. Coupé par défaut — ce qu'il ajoute est réel mais large, et une
+       matrice qui s'allume de partout au premier essai ne se lit pas. */
+    cveHeritees: false,
+    cvePerimetre: null,        // date de génération de la table, lue au premier chargement
 };
 
 /** Bouton d'agrandissement, en haut à droite de chaque panneau. */
@@ -83,13 +95,14 @@ export function renderMatrix(app) {
                 <section class="dash-panel" data-panel="cve">
                     <div class="panel-head"><h2>CVE</h2></div>
                     <div class="panel-body">
-                        <input type="search" id="dash-cve" placeholder="CVE-2026-2525" disabled
-                               autocomplete="off" aria-describedby="dash-cve-note">
-                        <p class="panel-note" id="dash-cve-note">
-                            Retrouver les techniques ATT&amp;CK liées à une vulnérabilité,
-                            à brancher sur <a href="https://galeax.github.io/CVE2CAPEC/"
-                            target="_blank" rel="noopener">CVE2CAPEC</a>.
-                        </p>
+                        <input type="search" id="dash-cve" placeholder="CVE-2021-44228"
+                               autocomplete="off" spellcheck="false" aria-describedby="dash-cve-note">
+                        <button class="cve-toggle" id="cve-heritees" type="button"
+                                aria-pressed="${view.cveHeritees}">
+                            <span class="cve-toggle-dot" aria-hidden="true"></span>
+                            Techniques héritées
+                        </button>
+                        <div id="dash-cve-note"></div>
                     </div>
                 </section>
             </div>
@@ -145,6 +158,7 @@ export function renderMatrix(app) {
     buildExportPanel(app);
 
     $("#matrix-search").oninput = e => { view.query = e.target.value.trim(); paint(app); };
+    brancherCve(app);
     $("#matrix-subs").onchange = e => { view.showSubs = e.target.checked; paint(app); };
     $("#matrix-quiz").onclick = () => app.show("quiz");
 
@@ -412,7 +426,12 @@ function paint(app) {
     // Une mitigation peut ne viser qu'une sous-technique : on surligne alors
     // aussi la technique parente, sinon la case visible resterait éteinte.
     let highlighted = null;
-    if (view.highlight) {
+    if (view.cve?.connue) {
+        // Les techniques parentes des sous-techniques sont déjà dans les listes,
+        // posées à la génération du fichier : ici il n'y a qu'à réunir.
+        highlighted = new Set(view.cve.direct);
+        if (view.cveHeritees) for (const id of view.cve.heritees) highlighted.add(id);
+    } else if (view.highlight) {
         highlighted = new Set(data.mitigationById.get(view.highlight)?.techniques ?? []);
         for (const id of [...highlighted]) highlighted.add(String(id).split(".")[0]);
     }
@@ -525,10 +544,163 @@ function paintSide(app) {
     paintMitigations(app);
 }
 
+/* ------------------------------------------------------- la recherche par CVE
+
+   Coller une CVE et voir s'allumer, sur la matrice, ce qu'elle permet à un
+   attaquant. C'est la même grammaire que le surlignage d'une mitigation, avec
+   la question retournée : là on demandait « celle-là, elle protège quoi ? », ici
+   on demande « celle-là, elle ouvre quoi ? ».
+
+   Deux qualités de lien, et c'est tout l'intérêt de les séparer. Le NVD attribue
+   à une CVE le CWE le plus précis qu'il connaisse, mais ce CWE-là ne mène
+   souvent nulle part dans ATT&CK ; ses ancêtres, si. Ce qu'on obtient en
+   remontant est vrai — la vulnérabilité appartient bien à cette famille — mais
+   ne caractérise plus la vulnérabilité elle-même. Les deux listes restent donc
+   distinctes, et les héritées sont coupées par défaut.
+
+   Le fichier de données pèse 1,7 Mo et n'est chargé qu'ici, à la première
+   recherche. D'où l'état d'attente : sur une liaison lente, la première CVE
+   demande une seconde ou deux, et un champ qui ne répond pas se lit comme une
+   panne. */
+
+/** Éteint le surlignage par CVE sans vider le champ, qui appartient au visiteur. */
+function effacerCve(app) {
+    if (!view.cve && !view.cveEnCours) return;
+    view.cve = null;
+    view.cveEnCours = false;
+    paintCve(app);
+}
+
+/* Le jeton d'appel. Chaque frappe relance une résolution asynchrone ; sans lui,
+   une réponse lente écraserait une réponse rapide arrivée après elle, et la
+   matrice afficherait le résultat d'une saisie déjà remplacée. */
+let appelCve = 0;
+
+function brancherCve(app) {
+    const champ = $("#dash-cve");
+    if (!champ) return;
+
+    let minuteur = null;
+    champ.oninput = () => {
+        clearTimeout(minuteur);
+        // On ne part pas à chaque caractère : « CVE-2021-44228 » en compte
+        // quatorze, et les treize premiers ne désignent rien.
+        minuteur = setTimeout(() => chercherCve(app, champ.value), 220);
+    };
+
+    $("#cve-heritees").onclick = () => {
+        view.cveHeritees = !view.cveHeritees;
+        paintCve(app);
+        paint(app);          // la matrice se rallume ou s'éteint d'autant
+    };
+
+    paintCve(app);
+}
+
+async function chercherCve(app, saisie) {
+    const jeton = ++appelCve;
+
+    if (!String(saisie).trim()) { effacerCve(app); paint(app); return; }
+    if (!normaliserCve(saisie)) {
+        // Saisie en cours de frappe, ou qui n'est pas une CVE : on n'efface pas
+        // le résultat précédent sur un caractère de trop, on attend.
+        view.cve = null;
+        view.cveEnCours = false;
+        paintCve(app);
+        paint(app);
+        return;
+    }
+
+    view.cveEnCours = true;
+    paintCve(app);
+
+    let resultat = null;
+    try {
+        resultat = await techniquesDeCve(saisie);
+    } catch (e) {
+        if (jeton !== appelCve) return;
+        view.cveEnCours = false;
+        view.cve = null;
+        paintCve(app, "Le fichier des CVE n'a pas pu être chargé.");
+        return;
+    }
+    if (jeton !== appelCve) return;          // une frappe plus récente a pris la main
+
+    view.cveEnCours = false;
+    view.cve = resultat;
+    // Le fichier est chargé à ce stade : demander son périmètre ne coûte plus
+    // rien, et sa date de génération est ce qui dit au visiteur jusqu'où la
+    // table va. Une CVE publiée depuis n'y est pas, et il faut qu'il le sache.
+    view.cvePerimetre ??= await perimetreCve().catch(() => null);
+    // Une CVE reconnue prend la main sur les deux autres mises en avant.
+    if (resultat?.connue) { view.highlight = ""; view.tactic = ""; paintMitigations(app); }
+    paintCve(app);
+    paint(app);
+}
+
+/** Le compte rendu sous le champ : ce qui est allumé, et à quel titre. */
+function paintCve(app, erreur = "") {
+    const hote = $("#dash-cve-note");
+    if (!hote) return;
+
+    const bouton = $("#cve-heritees");
+    if (bouton) bouton.setAttribute("aria-pressed", String(view.cveHeritees));
+
+    if (erreur) { hote.innerHTML = `<p class="panel-note cve-vide">${esc(erreur)}</p>`; return; }
+    if (view.cveEnCours) { hote.innerHTML = `<p class="panel-note">Recherche…</p>`; return; }
+
+    const cve = view.cve;
+    if (!cve) {
+        hote.innerHTML = `<p class="panel-note">
+            Collez une CVE pour voir sur la matrice les techniques qu'elle rend possibles.</p>`;
+        return;
+    }
+
+    if (!cve.connue) {
+        hote.innerHTML = `<p class="panel-note cve-vide">
+            ${cve.horsPerimetre
+                ? `Le millésime ${esc(cve.id.split("-")[1])} n'est pas couvert par la table embarquée.`
+                : `Aucune technique connue pour ${esc(cve.id)} : soit le NVD ne lui attribue pas de
+                   faiblesse, soit celle-ci ne mène à aucune technique ATT&amp;CK.`}
+        </p>`;
+        return;
+    }
+
+    const total = cve.direct.length + (view.cveHeritees ? cve.heritees.length : 0);
+    hote.innerHTML = `
+        <p class="cve-bilan">
+            <b>${esc(cve.id)}</b>
+            <span>${total} technique${total > 1 ? "s" : ""} en surbrillance</span>
+        </p>
+        <ul class="cve-detail">
+            <li><span class="cve-pastille directe"></span>
+                ${cve.direct.length} directe${cve.direct.length > 1 ? "s" : ""}, depuis la faiblesse
+                que le NVD attribue à cette CVE</li>
+            <li class="${view.cveHeritees ? "" : "coupee"}">
+                <span class="cve-pastille heritee"></span>
+                ${cve.heritees.length} héritée${cve.heritees.length > 1 ? "s" : ""}, depuis une famille
+                de faiblesses plus large${view.cveHeritees ? "" : ", non comptées ici"}</li>
+        </ul>
+        ${view.cvePerimetre ? `<p class="panel-note cve-fraicheur">
+            Table figée au ${esc(dateCourte(view.cvePerimetre.genere))} :
+            une CVE publiée depuis n'y figure pas.</p>` : ""}`;
+}
+
+/* La table est figée à la publication du site : autant l'écrire en toutes
+   lettres. Une date au format ISO dans une interface se lit comme une donnée
+   technique échappée du code. */
+function dateCourte(iso) {
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime())
+        ? "?"
+        : d.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+}
+
 /** Sélectionne — ou désélectionne — la tactique à mettre en avant. */
 function choisirTactique(app, shortname) {
     view.tactic = view.tactic === shortname ? "" : shortname;
-    view.highlight = "";           // les deux mises en avant s'excluent
+    view.highlight = "";           // les trois mises en avant s'excluent
+    effacerCve(app);
     paintMitigations(app);
     paint(app);
 }
@@ -587,7 +759,8 @@ function paintMitigations(app) {
         // sélectionne est celui qui désélectionne.
         row.onclick = () => {
             view.highlight = view.highlight === row.dataset.mitigation ? "" : row.dataset.mitigation;
-            view.tactic = "";       // les deux mises en avant s'excluent
+            view.tactic = "";       // les trois mises en avant s'excluent
+            effacerCve(app);
             paintMitigations(app);
             paint(app);
         };
@@ -770,5 +943,7 @@ export function resetMatrixView() {
     view.platformsReady = false;
     view.highlight = "";
     view.tactic = "";
+    view.cve = null;
+    view.cveEnCours = false;
     view.expanded = null;
 }
