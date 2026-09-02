@@ -151,6 +151,39 @@
     .quiz-answer.na:hover { border-color: var(--text-dim); color: var(--text-dim); background: var(--surface-3); }
 }
 
+/* --- une question hors d'atteinte ---
+
+   Elle s'affiche entière : on est venu la lire, la masquer reviendrait à ne pas
+   l'ouvrir. Ce qui change, c'est qu'on ne peut pas y répondre — et cela doit se
+   voir avant de cliquer, pas après. Les trois boutons perdent leur relief et
+   leur curseur, et un mot dit pourquoi et où retourner.
+
+   La carte, elle, garde son fond : l'éteindre ferait passer la question pour
+   désactivée alors qu'elle est seulement à venir. */
+.quiz-card.locked .quiz-answers { opacity: 0.45; }
+.quiz-answer:disabled { cursor: not-allowed; }
+.quiz-answer:disabled:active { transform: none; }
+
+.quiz-locked {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+    margin: 16px 0 0;
+    font-size: 0.73rem;
+    line-height: 1.55;
+    color: var(--text-dim);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 11px 13px;
+}
+.quiz-locked-icon { color: var(--accent); font-weight: 700; line-height: 1; flex: 0 0 auto; }
+/* Le raccourci est dans l'encart, pas dans la barre du bas : c'est la réponse à
+   ce que la phrase vient d'expliquer, et il se lit dans la foulée. Sur sa propre
+   ligne — glissé en fin de phrase, il se faisait couper par le retour à la ligne
+   et ressemblait à un mot souligné. */
+.quiz-locked .btn { display: flex; width: fit-content; margin-top: 9px; }
+
 .quiz-tool { margin-top: 16px; display: flex; flex-direction: column; gap: 5px; }
 .quiz-tool input { width: 100%; }
 

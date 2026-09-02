@@ -356,6 +356,25 @@ const editM1018 = [...window.document.querySelectorAll("#modal-panel [data-edit]
 ok("« Modifier ma réponse » disponible pour M1018", !!editM1018);
 editM1018.click();
 ok("le questionnaire s'ouvre bien sur M1018", openMitigation() === "M1018", openMitigation());
+
+/* Rouvrir une mitigation ne ramène plus à sa première question. M1018 est
+   terminée : elle s'ouvre sur sa dernière, là où le parcours s'est arrêté.
+   Refaire défiler huit « Suivant » sur des réponses déjà données pour atteindre
+   celle qu'on venait changer était le reproche principal fait à cet écran. */
+const rangAffiche = () => window.document.querySelector(".quiz-card")?.dataset.question;
+ok("une mitigation terminée se rouvre sur sa dernière question, pas sur la première",
+   rangAffiche() !== "1" && rangAffiche() === window.document.querySelector(".quiz-card")?.dataset.total,
+   `Q${rangAffiche()} sur ${window.document.querySelector(".quiz-card")?.dataset.total}`);
+
+// Pour la faire retomber à 0 il faut donc remonter, ce qui exerce « Précédent »
+// sur toute la longueur du questionnaire.
+let remontees = 0;
+while (window.document.getElementById("q-back") && remontees++ < 60) {
+    window.document.getElementById("q-back").click();
+}
+ok("« Précédent » remonte jusqu'à la première question", rangAffiche() === "1",
+   `Q${rangAffiche()} après ${remontees} retours`);
+
 window.document.querySelector('[data-answer="Non"]').click();     // M1018 retombe à 0
 window.document.getElementById("r-matrix").click();
 
@@ -3644,6 +3663,101 @@ console.log("\n[44] Le survol est réservé au pointeur");
     ok("le halo des cartes ne se branche pas sur un écran tactile",
        /matchMedia\?\.\("\(hover: hover\)"\)\.matches/.test(homeJs) &&
        homeJs.indexOf("matchMedia") < homeJs.indexOf("pointermove"));
+}
+
+console.log("\n[45] Reprendre une mitigation, et circuler dedans");
+{
+    const { QUESTIONNAIRES: QS } = await import(`${APP}/js/catalog.js`);
+    // La première du catalogue en compte trois : assez pour qu'un « Non » au
+    // milieu laisse une question hors d'atteinte derrière lui.
+    const premiere = [...QS.keys()][0];
+    const combien = QS.get(premiere).questions.length;
+
+    const carte = () => window.document.querySelector(".quiz-card");
+    const rang = () => carte()?.dataset.question;
+    const boutons = () => [...window.document.querySelectorAll("[data-answer]")];
+    const choisie = () => boutons().find(b => b.classList.contains("selected"))?.dataset.answer ?? null;
+    const rouvrirDepuisLaMatrice = () => {
+        window.document.querySelector(`[data-mitigation="${premiere}"]`).click();
+        const bouton = window.document.querySelector(`[data-quiz="${premiere}"]`);
+        bouton.click();
+        return bouton;
+    };
+
+    ok("la mitigation d'essai a de quoi laisser une question derrière un « Non »",
+       combien >= 3, `${premiere}, ${combien} questions`);
+
+    window.document.getElementById("brand").click();
+    window.document.getElementById("home-new").click();
+    window.document.getElementById("nl-ok").click();
+
+    /* --- 1. reprendre sur le « Non » ---
+
+       Deux réponses, la seconde « Non » : la mitigation est close à la question
+       2, et c'est là qu'elle doit se rouvrir. */
+    ok("on démarre sur la première question", rang() === "1");
+    window.document.querySelector('[data-answer="Oui"]').click();
+    window.document.querySelector('[data-answer="Non"]').click();
+    ok("un « Non » clôt la mitigation et affiche le résultat",
+       !!window.document.querySelector(".result-badge"));
+
+    window.document.getElementById("r-matrix").click();
+    ok("la matrice propose de rouvrir le questionnaire", !!rouvrirDepuisLaMatrice());
+
+    /* Le point de la demande : avant, on repartait de la question 1 et il fallait
+       recliquer « Suivant » sur chaque réponse déjà donnée pour revenir au
+       blocage. */
+    ok("la mitigation se rouvre sur le « Non » qui l'a close, pas au début",
+       rang() === "2", `Q${rang()}`);
+    ok("et le « Non » y est toujours marqué", choisie() === "Non", String(choisie()));
+
+    /* --- 2. circuler au-delà, sans pouvoir y répondre --- */
+    window.document.getElementById("q-next").click();
+    ok("« Suivant » laisse lire la question d'après", rang() === "3", `Q${rang()}`);
+    ok("elle s'affiche verrouillée", !!carte() && carte().classList.contains("locked"));
+    ok("ses trois réponses sont fermées", boutons().length === 3 && boutons().every(b => b.disabled),
+       boutons().map(b => `${b.dataset.answer}:${b.disabled}`).join(" "));
+    ok("un mot dit pourquoi, et où revenir",
+       /question 2/.test(window.document.querySelector(".quiz-locked")?.textContent ?? ""),
+       window.document.querySelector(".quiz-locked")?.textContent.replace(/\s+/g, " ").trim().slice(0, 70));
+
+    /* Le verrou ne tient pas qu'à l'attribut `disabled` : le gestionnaire refuse
+       aussi d'écrire. Sans quoi un clic simulé, ou l'attribut retiré depuis la
+       console du navigateur, fabriquerait un niveau 4 sans niveau 1. */
+    boutons().find(b => b.dataset.answer === "Oui").dispatchEvent(new window.Event("click"));
+    ok("un clic forcé n'enregistre rien", rang() === "3" && choisie() === null,
+       `Q${rang()} réponse ${choisie()}`);
+
+    // Revenir ne doit pas coûter autant de clics qu'on en a mis à avancer.
+    window.document.getElementById("q-resume").click();
+    ok("le raccourci ramène à la question qui attend", rang() === "2", `Q${rang()}`);
+    ok("et là, on peut répondre",
+       boutons().every(b => !b.disabled) && !carte().classList.contains("locked"));
+
+    /* --- 3. la frontière recule au fur et à mesure --- */
+    window.document.querySelector('[data-answer="Oui"]').click();
+    ok("répondre « Oui » ouvre la question suivante",
+       rang() === "3" && !carte().classList.contains("locked"), `Q${rang()}`);
+    window.document.getElementById("q-back").click();
+    ok("on revient librement sur une réponse déjà donnée", rang() === "2" && choisie() === "Oui",
+       `Q${rang()} réponse ${choisie()}`);
+    ok("« Suivant » est là sans qu'il y ait de nouvelle réponse à donner",
+       !!window.document.getElementById("q-next"));
+
+    /* --- 4. l'autre point de reprise : la première question sans réponse ---
+
+       Un parcours interrompu en cours de route, sans aucun « Non ». */
+    window.document.getElementById("brand").click();
+    window.document.getElementById("home-new").click();
+    window.document.getElementById("nl-ok").click();
+    window.document.querySelector('[data-answer="Oui"]').click();
+    ok("on est passé à la question 2", rang() === "2");
+    window.document.getElementById("q-matrix").click();
+    rouvrirDepuisLaMatrice();
+    ok("une mitigation entamée se rouvre sur sa première question sans réponse",
+       rang() === "2" && choisie() === null, `Q${rang()} réponse ${choisie()}`);
+    ok("la question 1, déjà répondue, reste accessible en arrière",
+       !!window.document.getElementById("q-back"));
 }
 
 // Le nombre d'assertions est affiché plutôt que recopié dans le README, où il

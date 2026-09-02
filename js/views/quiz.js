@@ -5,8 +5,21 @@
    « Oui », un « Non » clôt la mitigation. « N/A » ne bloque pas — la question
    sort du périmètre du répondant sans interrompre la progression.
 
-   Seule M1032 est renseignée pour l'instant ; la vue parcourt n'importe quel
-   nombre de mitigations du catalogue.
+   Deux notions à ne pas confondre, et c'est tout le fichier.
+
+   Où l'on regarde : `cursor.index`, libre. On circule d'une question à l'autre
+   par « Précédent » et « Suivant », en avant comme en arrière, y compris sur des
+   questions hors d'atteinte. Lire la suite ne coûte rien et renseigne : on voit
+   où mène la mitigation avant de s'y engager.
+
+   Où l'on peut répondre : `frontiere()`, contrainte. Le parcours étant
+   progressif, la question 4 n'a de sens que si la 1 a été tranchée — y répondre
+   d'abord fabriquerait un niveau que rien ne soutient. Les questions au-delà de
+   la frontière s'affichent donc, mais leurs boutons sont fermés.
+
+   La frontière sert aussi à savoir où reprendre : ouvrir une mitigation déjà
+   entamée y amène directement, plutôt que de refaire défiler des questions déjà
+   répondues.
    ========================================================================= */
 
 import { esc, $, toast, openModal, closeModal } from "../ui.js";
@@ -60,9 +73,12 @@ export function renderQuiz(app, { mitigation } = {}) {
     }
 
     if (mitigation && QUESTIONNAIRES.has(mitigation)) {
-        // Arrivée depuis « Modifier ma réponse » : on ouvre la mitigation visée
-        // au début de son questionnaire.
-        goTo(mitigation, 0);
+        // Arrivée depuis « Modifier ma réponse ». On ouvre la mitigation là où
+        // elle attend quelque chose — le « Non » qui l'a close, ou la première
+        // question sans réponse — et non à sa première question. Rouvrir une
+        // mitigation entamée obligeait sinon à recliquer « Suivant » sur chaque
+        // réponse déjà donnée avant d'atteindre celle qu'on venait changer.
+        goTo(mitigation, frontiere(app.layer, mitigation));
         paint(app);
         return;
     }
@@ -142,6 +158,40 @@ function stepBack(app) {
     return false;
 }
 
+/**
+ * La question la plus profonde à laquelle on ait le droit de répondre.
+ *
+ * C'est le même point sous deux angles : celui où le questionnaire attend une
+ * action, donc celui où l'on reprend, et celui au-delà duquel on ne peut plus
+ * répondre. Une seule fonction pour les deux, sans quoi « où reprendre » et
+ * « jusqu'où répondre » finiraient par diverger d'un cas de bord.
+ *
+ * La règle suit le parcours progressif, et rien d'autre :
+ *
+ *   - la première question sans réponse est la frontière : c'est là que le
+ *     questionnaire s'est arrêté, et on y répond ;
+ *   - un « Non » est la frontière : il clôt la mitigation, donc rien de ce qui
+ *     suit n'est atteignable. Il reste modifiable, sinon on ne pourrait jamais
+ *     rouvrir un parcours qu'on a fermé ;
+ *   - tout répondu sans « Non » : la dernière question fait office de frontière.
+ *     Il n'y a plus rien à ouvrir, et la borne doit rester atteignable pour
+ *     qu'on puisse revenir sur la dernière réponse.
+ *
+ * Les questions communes comptent comme répondues : `resolvedEntries` rend la
+ * réponse du groupe, qu'elle ait été donnée ici ou ailleurs. Une frontière qui
+ * les ignorerait rouvrirait un parcours que le groupe a déjà tranché.
+ */
+function frontiere(layer, mitigationId) {
+    const questions = getQuestionnaire(mitigationId).questions;
+    const entries = resolvedEntries(layer, mitigationId);
+
+    for (const [i, q] of questions.entries()) {
+        const value = entries[q.num]?.value;
+        if (!value || value === "Non") return i;
+    }
+    return Math.max(0, questions.length - 1);
+}
+
 /** Nombre de questions franchies parce que déjà tranchées ailleurs. */
 function skippedCount(app, questionnaire) {
     return questionnaire.questions
@@ -204,11 +254,30 @@ function paint(app) {
     const entry = entries[question.num];
     const answered = entry?.value ?? null;
     const pct = Math.round((cursor.index / total) * 100);
-    // Reculer n'a de sens que s'il reste une question posable en amont : toutes
-    // celles qui précèdent peuvent avoir été franchies.
+
+    /* --- ce qu'on peut faire ici ---
+
+       Circuler et répondre sont deux droits distincts. On circule partout dans
+       la mitigation ; on ne répond que jusqu'à la frontière. Au-delà, la
+       question s'affiche en entier — le texte, le palier visé, la place dans la
+       barre — mais les trois boutons sont fermés. */
+    const limite = frontiere(layer, cursor.mitigation);
+    const verrouillee = cursor.index > limite;
+    const attendue = questionnaire.questions[limite];
+
+    // Une borne n'a de sens que s'il reste une question posable au-delà : toutes
+    // celles qui l'entourent peuvent avoir été franchies parce que communes.
     const peutReculer = questionnaire.questions
         .slice(0, cursor.index)
         .some(q => !answeredElsewhere(layer, cursor.mitigation, q.num));
+    const posableApres = questionnaire.questions
+        .slice(cursor.index + 1)
+        .some(q => !answeredElsewhere(layer, cursor.mitigation, q.num));
+    /* « Suivant » ne dépend plus d'avoir répondu : c'est ce qui permet de lire la
+       suite. Sur la dernière question il ne subsiste que si le parcours est clos,
+       auquel cas il mène au résultat — sinon il conduirait à un écran de note sur
+       une mitigation à peine commencée. */
+    const peutAvancer = posableApres || questionnaireState(questionnaire, entries).complete;
 
     const texte = sharedText(questionnaire.id, question.num) ?? question.text;
     const avecOutil = needsTool(questionnaire.id, question);
@@ -231,31 +300,44 @@ function paint(app) {
                  échelles chiffrées au-dessus de la barre disaient ce qu'elle
                  montre déjà. Il reste porté ici, pour le banc d'essai et pour
                  qui inspecte la page. -->
-            <div class="quiz-card" data-question="${cursor.index + 1}" data-total="${total}">
+            <div class="quiz-card ${verrouillee ? "locked" : ""}"
+                 data-question="${cursor.index + 1}" data-total="${total}">
                 <p class="quiz-question">${esc(texte)}</p>
 
                 <div class="quiz-answers">
-                    <button class="quiz-answer yes ${answered === "Oui" ? "selected" : ""}" data-answer="Oui">Oui</button>
-                    <button class="quiz-answer no ${answered === "Non" ? "selected" : ""}" data-answer="Non">Non</button>
-                    <button class="quiz-answer na ${answered === "N/A" ? "selected" : ""}" data-answer="N/A">N/A</button>
+                    <button class="quiz-answer yes ${answered === "Oui" ? "selected" : ""}" data-answer="Oui" ${verrouillee ? "disabled" : ""}>Oui</button>
+                    <button class="quiz-answer no ${answered === "Non" ? "selected" : ""}" data-answer="Non" ${verrouillee ? "disabled" : ""}>Non</button>
+                    <button class="quiz-answer na ${answered === "N/A" ? "selected" : ""}" data-answer="N/A" ${verrouillee ? "disabled" : ""}>N/A</button>
                 </div>
 
-                ${avecOutil ? `
+                ${verrouillee ? `
+                    <p class="quiz-locked">
+                        <span class="quiz-locked-icon" aria-hidden="true">↑</span>
+                        <span>
+                            Le questionnaire est progressif : cette question ne s'ouvrira qu'une fois
+                            la question ${attendue.num} tranchée. Vous pouvez la lire dès maintenant,
+                            pas encore y répondre.
+                            <button class="btn btn-sm" id="q-resume">Reprendre à la question ${attendue.num}</button>
+                        </span>
+                    </p>` : ""}
+
+                ${avecOutil && !verrouillee ? `
                     <div class="quiz-tool">
                         <label for="q-tool">Outil en place, si applicable</label>
                         <input type="text" id="q-tool" value="${esc(entry?.tool || "")}"
                                placeholder="ex : Entra ID, Duo, PingID…" autocomplete="off">
                     </div>` : ""}
 
-                <button class="btn btn-ghost btn-sm quiz-ask" id="q-ask">
-                    ${GLYPH_ASK} Faire suivre cette question
-                </button>
+                ${verrouillee ? "" : `
+                    <button class="btn btn-ghost btn-sm quiz-ask" id="q-ask">
+                        ${GLYPH_ASK} Faire suivre cette question
+                    </button>`}
             </div>
 
             <div class="quiz-nav">
                 ${peutReculer ? `<button class="btn btn-ghost" id="q-back">← Précédent</button>` : ""}
                 <span class="grow"></span>
-                ${answered ? `<button class="btn btn-sm" id="q-next">Suivant →</button>` : ""}
+                ${peutAvancer ? `<button class="btn btn-sm" id="q-next">Suivant →</button>` : ""}
                 <button class="btn btn-sm" id="q-matrix">Voir la matrice</button>
             </div>
         </div>`;
@@ -271,9 +353,16 @@ function paint(app) {
     };
     const back = $("#q-back");                 // absent sur la première question posable
     if (back) back.onclick = () => { if (stepBack(app)) paint(app); };
-    const next = $("#q-next");                 // rendu seulement si la question a une réponse
+    const next = $("#q-next");                 // absent au bout d'un parcours encore ouvert
     if (next) next.onclick = () => advance(app);
-    $("#q-ask").onclick = () => askSomeone(app, questionnaire, question, texte);
+    // Le raccourci du verrou : plutôt que de laisser recliquer « Précédent »
+    // autant de fois qu'on a avancé pour lire.
+    const resume = $("#q-resume");
+    if (resume) resume.onclick = () => { cursor.index = limite; paint(app); };
+    // Faire suivre une question, c'est mettre la mitigation en attente sur son
+    // point de blocage : cela n'a de sens que sur la question qui bloque.
+    const ask = $("#q-ask");
+    if (ask) ask.onclick = () => askSomeone(app, questionnaire, question, texte);
     $("#q-matrix").onclick = () => app.show("matrix");
 }
 
@@ -440,6 +529,11 @@ function levelTrack(attained, currentLevel = null) {
 function answer(app, value) {
     const questionnaire = getQuestionnaire(cursor.mitigation);
     const question = questionnaire.questions[cursor.index];
+
+    // Les boutons sont déjà fermés au-delà de la frontière ; la règle est
+    // redite ici parce que c'est le seul endroit qui écrit dans le layer, et
+    // qu'une note fabriquée par une réponse hors d'atteinte ne se verrait pas.
+    if (cursor.index > frontiere(app.layer, cursor.mitigation)) return;
 
     const wasAnswered = resolvedEntries(app.layer, cursor.mitigation)[question.num]?.value ?? null;
     const dropped = setAnswer(app.layer, cursor.mitigation, question.num, {
