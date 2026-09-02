@@ -95,7 +95,7 @@
 .rosace-export { display: none; flex: 0 0 auto; padding: 4px 9px; font-size: 0.7rem; }
 #dash[data-expanded="rosace"] .rosace-export { display: inline-flex; }
 
-.panel-expand:hover { background: var(--surface-3); color: var(--text); }
+@media (hover: hover) { .panel-expand:hover { background: var(--surface-3); color: var(--text); } }
 .panel-expand svg { display: block; width: 13px; height: 13px; }
 .panel-expand .ico-close { display: none; }
 
@@ -167,7 +167,7 @@
     text-align: left;
     cursor: pointer;
 }
-.mit-row:hover { background: var(--surface-3); border-color: var(--border); }
+@media (hover: hover) { .mit-row:hover { background: var(--surface-3); border-color: var(--border); } }
 .mit-row.selected { background: var(--accent-wash); border-color: var(--accent); }
 
 /* Action de la ligne sélectionnée. Elle n'apparaît que là : proposée sur les
@@ -185,7 +185,7 @@
     text-align: left;
     cursor: pointer;
 }
-.mit-quiz:hover { text-decoration: underline; }
+@media (hover: hover) { .mit-quiz:hover { text-decoration: underline; } }
 .mit-hint { margin: 2px 0 4px; padding-left: 38px; font-size: 0.68rem; line-height: 1.45; color: var(--text-mute); }
 
 .mit-score {
@@ -352,7 +352,7 @@
     display: flex; align-items: center; gap: 8px;
     padding: 5px 7px; border-radius: 4px; cursor: pointer; font-size: 0.76rem;
 }
-.dropdown-panel .row:hover { background: var(--surface-3); }
+@media (hover: hover) { .dropdown-panel .row:hover { background: var(--surface-3); } }
 .dropdown-panel .row input { accent-color: var(--accent); }
 .dropdown-panel .sep { height: 1px; background: var(--border); margin: 6px 2px; }
 .dropdown-panel .hint { font-size: 0.68rem; color: var(--text-mute); padding: 4px 7px 7px; line-height: 1.45; }
@@ -555,7 +555,10 @@
     outline: 2px solid transparent;
     outline-offset: -2px;
 }
-.cell:hover { outline-color: var(--text); z-index: 5; }
+/* Le liseré du survol désigne la case que va ouvrir un clic. Au doigt il n'y a
+   rien à désigner — on touche, la case s'ouvre — et le liseré resterait sur la
+   dernière case effleurée en faisant défiler la matrice. */
+@media (hover: hover) { .cell:hover { outline-color: var(--text); z-index: 5; } }
 .cell .c-id { font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
 .cell .c-name { display: block; }
 

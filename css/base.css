@@ -57,6 +57,26 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
+/* --- le toucher ---
+
+   Deux réflexes du navigateur mobile gênent ici, et ce fichier en coupe un ;
+   l'autre est traité règle par règle, plus bas et dans les autres feuilles.
+
+   Le premier : au moindre appui, un rectangle gris se pose sur l'élément touché.
+   Il date des pages où rien ne réagissait au doigt et où il fallait bien montrer
+   que le geste avait porté. Ici tout ce qui se clique a déjà son retour visuel —
+   un bouton s'enfonce, une réponse se colore —, et ce voile ne fait que
+   souligner au passage des blocs qui ne sont pas cliquables du tout.
+
+   Le second : le survol. Un écran tactile n'a pas de pointeur qui se promène, il
+   a un doigt qui se pose ; le navigateur applique donc `:hover` à l'endroit
+   touché et l'y laisse jusqu'au toucher suivant. Une carte qui se soulève au
+   survol se soulève alors pendant qu'on défile, et reste soulevée après. D'où la
+   règle suivie partout dans ces feuilles : tout survol décoratif vit dans un
+   `@media (hover: hover)`, et ce qui doit répondre au doigt le fait par
+   `:active`, qui, lui, retombe tout seul. */
+html { -webkit-tap-highlight-color: transparent; }
+
 html, body { height: 100%; }
 
 body {
@@ -226,8 +246,14 @@ body {
     transform: scale(0.92);
     transition: opacity 0.18s ease, transform 0.18s ease;
 }
-.nav-link:hover, .nav-link.current { color: var(--text); }
-.nav-link:hover::before, .nav-link.current::before { opacity: 1; transform: none; }
+/* `.current` n'est pas un survol : c'est la section où l'on se trouve, et elle
+   doit se voir au doigt comme à la souris. */
+.nav-link.current { color: var(--text); }
+.nav-link.current::before { opacity: 1; transform: none; }
+@media (hover: hover) {
+    .nav-link:hover { color: var(--text); }
+    .nav-link:hover::before { opacity: 1; transform: none; }
+}
 .nav-link > span { position: relative; }
 
 /* N'existe que dans le panneau des écrans étroits. */
@@ -252,7 +278,7 @@ body {
     color: var(--text);
     cursor: pointer;
 }
-.nav-toggle:hover { background: var(--overlay); }
+@media (hover: hover) { .nav-toggle:hover { background: var(--overlay); } }
 /* Les deux barres sont les pseudo-éléments d'un conteneur qui, lui, ne tourne
    jamais. Une barre portée par le conteneur et l'autre par son `::after`
    donnerait un chevron : le pseudo-élément hérite de la rotation du parent, et
@@ -344,16 +370,16 @@ button { font-family: inherit; }
     cursor: pointer;
     transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
 }
-.btn:hover { border-color: var(--accent); color: var(--accent); }
+/* L'enfoncement est le seul retour que voit un doigt, et c'est celui qui compte :
+   il se déclenche à l'appui, il retombe au relâchement, et il ne survit pas au
+   défilement. Les couleurs de survol, elles, sont rangées plus bas. */
 .btn:active { transform: translateY(1px); }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
-.btn:disabled:hover { border-color: var(--border-strong); color: var(--text); }
+.btn:disabled:active { transform: none; }
 
 .btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
-.btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: var(--accent-ink); }
 
 .btn-ghost { background: none; border-color: transparent; color: var(--text-dim); }
-.btn-ghost:hover { background: var(--surface-3); color: var(--text); border-color: transparent; }
 
 .btn-icon { padding: 7px 9px; font-size: 0.9rem; line-height: 1; }
 .btn-sm { padding: 5px 10px; font-size: 0.72rem; }
@@ -381,12 +407,6 @@ button { font-family: inherit; }
     color: var(--ink-text);
     font-weight: 600;
 }
-.btn-cta:hover {
-    background: var(--ink-2);
-    border-color: transparent;
-    color: var(--ink-text);
-    box-shadow: var(--shadow-sm);
-}
 
 /* Le second choix d'une paire : présent, mais qui ne dispute pas la première
    place. Un contour seul, sur le fond de la page. */
@@ -395,10 +415,29 @@ button { font-family: inherit; }
     border-color: var(--border-strong);
     color: var(--text);
 }
-.btn-quiet:hover {
-    background: var(--overlay);
-    border-color: var(--text-mute);
-    color: var(--text);
+/* --- les survols de la famille des boutons ---
+
+   Rassemblés ici, et non collés à chaque variante, parce qu'ils partagent tous
+   la même condition : un pointeur qui survole. Au doigt, `:hover` se pose sur le
+   dernier bouton touché et y reste — le bouton « Créer un layer » resterait
+   allumé pendant tout le reste de la visite. Ce qui répond au doigt est au-dessus,
+   dans `:active`. */
+@media (hover: hover) {
+    .btn:hover { border-color: var(--accent); color: var(--accent); }
+    .btn:disabled:hover { border-color: var(--border-strong); color: var(--text); }
+    .btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: var(--accent-ink); }
+    .btn-ghost:hover { background: var(--surface-3); color: var(--text); border-color: transparent; }
+    .btn-cta:hover {
+        background: var(--ink-2);
+        border-color: transparent;
+        color: var(--ink-text);
+        box-shadow: var(--shadow-sm);
+    }
+    .btn-quiet:hover {
+        background: var(--overlay);
+        border-color: var(--text-mute);
+        color: var(--text);
+    }
 }
 
 /* --------------------------------------------------------- champs de saisie */
@@ -551,7 +590,7 @@ label { font-size: 0.74rem; color: var(--text-dim); }
     background: none; border: 0; color: var(--text-mute);
     font-size: 1.3rem; line-height: 1; cursor: pointer; padding: 4px 8px; border-radius: var(--radius-sm);
 }
-.modal-close:hover { background: var(--surface-3); color: var(--text); }
+@media (hover: hover) { .modal-close:hover { background: var(--surface-3); color: var(--text); } }
 
 /* ------------------------------------------------------------------ toasts */
 

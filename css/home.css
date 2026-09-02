@@ -255,8 +255,10 @@
 }
 @keyframes hm-pose { to { opacity: 1; transform: none; } }
 
-.hm-grid:hover .hm-col { opacity: 0.42; }
-.hm-grid:hover .hm-col:hover { opacity: 1; }
+@media (hover: hover) {
+    .hm-grid:hover .hm-col { opacity: 0.42; }
+    .hm-grid:hover .hm-col:hover { opacity: 1; }
+}
 
 .hm-head {
     display: flex;
@@ -363,10 +365,16 @@
     box-shadow: var(--shadow-sm);
     transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
-.action-card:hover {
-    border-color: var(--border-strong);
-    transform: translateY(-3px);
-    box-shadow: var(--shadow-lg);
+/* La carte n'est pas cliquable : le bouton qu'elle contient l'est. Son
+   soulèvement ne dit donc rien d'autre que « le pointeur est ici », et un doigt
+   qui fait défiler la page n'a rien à annoncer. Sans cette condition, « Nouveau
+   layer » se soulève au passage du pouce et y reste. */
+@media (hover: hover) {
+    .action-card:hover {
+        border-color: var(--border-strong);
+        transform: translateY(-3px);
+        box-shadow: var(--shadow-lg);
+    }
 }
 
 .action-card .glyph { display: block; color: var(--accent); }
@@ -385,7 +393,13 @@
     cursor: pointer;
     transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
 }
-.drop-zone:hover, .drop-zone.hover { border-color: var(--accent); color: var(--accent); background: var(--accent-wash); }
+/* `.hover` est posée par le glisser-déposer, pas par le pointeur : elle n'a rien
+   à faire dans la condition, et sur un téléphone elle n'arrive jamais. En
+   revanche la zone se touche, donc elle garde un retour à l'appui. */
+.drop-zone.hover, .drop-zone:active { border-color: var(--accent); color: var(--accent); background: var(--accent-wash); }
+@media (hover: hover) {
+    .drop-zone:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-wash); }
+}
 .drop-zone b { color: var(--text); font-weight: 600; }
 .drop-zone.hover b { color: var(--accent); }
 
@@ -516,8 +530,13 @@
     transition: opacity 0.25s ease;
     pointer-events: none;
 }
-.benefit-card:hover { transform: translateY(-4px); border-color: var(--ink-border); }
-.benefit-card:hover::before { opacity: 1; }
+/* Même raison que pour les cartes d'action, et c'est ici que cela se voyait le
+   plus : quatre cartes qui se soulèvent l'une après l'autre sous le pouce
+   pendant qu'on descend la page. */
+@media (hover: hover) {
+    .benefit-card:hover { transform: translateY(-4px); border-color: var(--ink-border); }
+    .benefit-card:hover::before { opacity: 1; }
+}
 
 .benefit-card h3 {
     position: relative;
@@ -590,7 +609,7 @@
     background: var(--surface-2);
     transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
-.faq-item:hover { border-color: var(--border-strong); }
+@media (hover: hover) { .faq-item:hover { border-color: var(--border-strong); } }
 .faq-item[open] { border-color: var(--border-strong); box-shadow: var(--shadow-sm); }
 
 .faq-item summary {
@@ -661,10 +680,12 @@
     border-color: var(--ink-text);
     color: var(--ink);
 }
-.site-footer .btn-primary:hover {
-    background: #ffffff;
-    border-color: #ffffff;
-    color: var(--ink);
+@media (hover: hover) {
+    .site-footer .btn-primary:hover {
+        background: #ffffff;
+        border-color: #ffffff;
+        color: var(--ink);
+    }
 }
 
 .footer-cols {
@@ -708,7 +729,9 @@
     width: fit-content;
     transition: color 0.15s ease;
 }
-.footer-col a:hover { color: var(--ink-text); text-decoration: underline; text-underline-offset: 3px; }
+@media (hover: hover) {
+    .footer-col a:hover { color: var(--ink-text); text-decoration: underline; text-underline-offset: 3px; }
+}
 
 .home-foot {
     margin: clamp(40px, 6vw, 64px) 0 0;
@@ -832,7 +855,7 @@
    Le curseur n'annonce une action que là où il y en a une — sur l'accueil, la
    rosace est un exemple et il n'y a pas de matrice à surligner. */
 .ros-hit { fill: transparent; }
-.ros-vertex:hover .ros-dot { r: 4.8; }
+@media (hover: hover) { .ros-vertex:hover .ros-dot { r: 4.8; } }
 #dash-rosace .ros-hit { cursor: pointer; }
 
 .ros-hub { fill: var(--surface); stroke: var(--border); stroke-width: 0.6; }

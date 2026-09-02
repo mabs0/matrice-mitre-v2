@@ -474,9 +474,17 @@ function footerSection() {
    met à jour ; tout le reste — l'apparition, l'extinction — est du CSS.
 
    Le calcul est deux soustractions par mouvement, sur les seules cartes
-   survolées : c'est ce que coûte le suivi, et c'est négligeable. Un pointeur
-   grossier n'a pas de survol du tout, la classe reste sans effet. */
+   survolées : c'est ce que coûte le suivi, et c'est négligeable.
+
+   Rien de tout cela n'est branché sur un écran tactile. Ce n'est pas une
+   précaution de performance mais une correction : `pointermove` se déclenche
+   aussi sous un doigt qui fait défiler la page, et le halo suivait le pouce sur
+   des cartes que le CSS n'allume plus au toucher — un relevé de position à
+   chaque image, pour un voile invisible. La condition est la même que celle des
+   feuilles de style, `hover: hover`, pour qu'un seul critère décide. */
 function suivreLePointeur() {
+    if (!window.matchMedia?.("(hover: hover)").matches) return;
+
     for (const carte of $$(".spotlight")) {
         carte.addEventListener("pointermove", e => {
             const boite = carte.getBoundingClientRect();

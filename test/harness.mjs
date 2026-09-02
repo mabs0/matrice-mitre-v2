@@ -3574,6 +3574,78 @@ console.log("\n[40] Aucun tiret cadratin dans ce que l'utilisateur lit");
        /—/.test(readFileSync(`${ROOT}/js/views/home.js`, "utf8")));
 }
 
+console.log("\n[44] Le survol est réservé au pointeur");
+{
+    /* Sur un écran tactile, le navigateur pose `:hover` là où le doigt s'arrête
+       et l'y laisse jusqu'au toucher suivant. Ce que cela donnait : les cartes
+       des bénéfices et celles du layer se soulevaient sous le pouce pendant le
+       défilement, et restaient soulevées.
+
+       La règle du dépôt est donc qu'un survol vit dans un `@media (hover: hover)`.
+       Ce qui doit répondre au doigt le fait autrement — `:active`, qui retombe de
+       lui-même, ou une classe posée par le code. Ce test relit les feuilles pour
+       que la règle ne se perde pas à la prochaine carte ajoutée.
+
+       Le découpage suit les accolades plutôt qu'une expression régulière : un
+       `@media` en contient d'autres, et un motif plat les confondrait. */
+    const enSurvol = (css) => {
+        const pile = [];
+        const libres = [];
+        let debut = 0;
+        css = css.replace(/\/\*[\s\S]*?\*\//g, "");
+        for (let i = 0; i < css.length; i++) {
+            if (css[i] === "{") {
+                const entete = css.slice(debut, i).trim().replace(/\s+/g, " ");
+                pile.push(entete);
+                debut = i + 1;
+                const garde = pile.some(e => e.startsWith("@media") && e.includes("hover: hover"));
+                if (!entete.startsWith("@") && entete.includes(":hover") && !garde) libres.push(entete);
+            } else if (css[i] === "}") {
+                pile.pop();
+                debut = i + 1;
+            }
+        }
+        return libres;
+    };
+
+    /* La seule exception admise : le mouvement réduit, où les règles de survol
+       ne s'ajoutent pas mais s'annulent. Une annulation doit valoir partout,
+       sinon elle ne sert à rien. */
+    const excuse = e => /opacity:\s*1|\.hm-grid:hover \.hm-col/.test(e);
+
+    for (const feuille of ["base.css", "home.css", "matrix.css", "quiz.css"]) {
+        const css = readFileSync(`${ROOT}/css/${feuille}`, "utf8");
+        const libres = enSurvol(css).filter(e => !excuse(e));
+        ok(`${feuille} ne laisse aucun survol hors du garde-fou`,
+           libres.length === 0, libres.slice(0, 4).join(" | "));
+    }
+
+    /* L'autre moitié : ce qui doit continuer de répondre au doigt. Un bouton
+       sans retour à l'appui se lit comme un bouton mort. */
+    const baseCss = readFileSync(`${ROOT}/css/base.css`, "utf8");
+    const homeCss = readFileSync(`${ROOT}/css/home.css`, "utf8");
+    ok("un bouton s'enfonce encore à l'appui",
+       /\.btn:active\s*\{[^}]*transform/.test(baseCss));
+    ok("la zone de dépôt répond au toucher, pas seulement au survol",
+       /\.drop-zone[^{]*:active[^{]*\{/.test(homeCss));
+    ok("la section courante reste marquée sans dépendre du survol",
+       /\.nav-link\.current\s*\{/.test(baseCss));
+    ok("et le glisser-déposer garde sa classe à lui",
+       /\.drop-zone\.hover/.test(homeCss));
+
+    /* Le voile gris que le navigateur mobile pose sur tout ce qu'on touche,
+       cliquable ou non. */
+    ok("le voile de toucher du navigateur est retiré",
+       /-webkit-tap-highlight-color:\s*transparent/.test(baseCss));
+
+    /* Le halo des cartes suit `pointermove`, qui se déclenche aussi sous un
+       doigt qui fait défiler. */
+    const homeJs = readFileSync(`${ROOT}/js/views/home.js`, "utf8");
+    ok("le halo des cartes ne se branche pas sur un écran tactile",
+       /matchMedia\?\.\("\(hover: hover\)"\)\.matches/.test(homeJs) &&
+       homeJs.indexOf("matchMedia") < homeJs.indexOf("pointermove"));
+}
+
 // Le nombre d'assertions est affiché plutôt que recopié dans le README, où il
 // avait dérivé de plusieurs centaines sans que personne s'en aperçoive.
 console.log(`\n${failures === 0 ? `TOUT PASSE — ${checks} assertions` : `${failures} ÉCHEC(S) sur ${checks} assertions`}\n`);
