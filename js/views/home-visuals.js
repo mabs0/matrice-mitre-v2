@@ -359,7 +359,9 @@ export function heroMatrix(data) {
         const techniques = (data.byTactic?.get(tactic.shortname) ?? []).slice(0, HERO.lignes);
         const cases = techniques.map(tech => {
             const niveau = dé() < HERO.partVides ? "vide" : `l${Math.floor(dé() * 5)}`;
-            return `<span class="hm-cell ${niveau}">${esc(tech.name)}</span>`;
+            // Le nom vit dans son propre span : la case garde une hauteur fixe et
+            // centre son contenu, le span se charge de couper à deux lignes.
+            return `<span class="hm-cell ${niveau}"><span>${esc(tech.name)}</span></span>`;
         }).join("");
         return `<div class="hm-col" style="--col:${rang}">
                     <span class="hm-head">${esc(tactic.name)}</span>
