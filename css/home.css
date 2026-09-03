@@ -742,11 +742,6 @@
     text-align: center;
 }
 
-/* Dans le pied de page, la mascotte se pose sur du sombre quel que soit le
-   thème : ses couleurs ne peuvent pas venir des jetons de surface. */
-.site-footer .m-eye { fill: var(--ink); }
-.site-footer .m-pupil { fill: var(--ink-text); }
-
 /* ------------------------------------------------------------------ rosace
 
    Toile d'araignée : un rayon par mitigation, quatre polygones de repère, et le

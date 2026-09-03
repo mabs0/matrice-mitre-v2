@@ -8,15 +8,20 @@
 
     <!--
         L'icône d'onglet, c'est la mascotte : le même poulpe que le logo de la
-        barre haute et que l'écran de chargement. Un fichier SVG plutôt qu'un
-        .ico — il tient en un tracé, reste net à toutes les tailles, et la
-        politique de sécurité l'autorise puisqu'il vient du site lui-même.
+        barre haute et que l'écran de chargement. Un PNG et non plus un SVG — le
+        dessin est peint, avec des dégradés et un liseré de lumière sur chaque
+        tentacule, que le tracé vectoriel rendait mal.
 
-        `mask-icon` est le repli de Safari, qui ne lit l'icône SVG que sous cette
-        forme, et lui applique la couleur annoncée.
+        Détourée, la mascotte n'a besoin d'aucune tuile de fond : son contour
+        marine la détache des onglets clairs, son corps bleu des sombres.
+        `apple-touch-icon` fait exception et repose sur un aplat sombre, parce
+        qu'iOS ignore la transparence et la remplacerait par du noir.
+
+        Plus de `mask-icon` : Safari attend là un tracé monochrome, ce que le
+        dessin n'est plus.
     -->
-    <link rel="icon" href="favicon.svg" type="image/svg+xml">
-    <link rel="mask-icon" href="favicon.svg" color="#2a78d6">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="32x32">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
 
     <!--
         Politique de sécurité du contenu.
@@ -193,31 +198,23 @@
 </head>
 <body>
     <!--
-        La mascotte, dessinée ici et référencée partout ailleurs par <use> : elle
-        sert de logo, accompagne le chargement et portera le tutoriel guidé. Ce
-        tracé est original — aucune illustration extérieure n'est reprise, ce qui
-        évite toute question de licence et laisse les droits entiers.
+        La mascotte, déclarée ici et référencée partout ailleurs par <use> : elle
+        sert de logo, accompagne le chargement et portera le tutoriel guidé. Le
+        dessin est original — aucune illustration extérieure n'est reprise, ce
+        qui évite toute question de licence et laisse les droits entiers.
+
+        Le <symbol> n'enveloppe plus un tracé mais l'image peinte. C'est ce qui
+        permet de changer la mascotte en remplaçant un seul fichier, sans revenir
+        sur les quatre endroits qui la posent. En contrepartie ses couleurs ne
+        suivent plus les jetons de thème, et ses tentacules ne peuvent plus être
+        animés séparément.
 
         Le conteneur n'est pas en display:none : certains navigateurs cessent de
         résoudre les <use> dont la source a un ancêtre masqué ainsi.
     -->
     <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
         <symbol id="mascot" viewBox="0 0 64 64">
-            <g class="m-arms" fill="none" stroke-width="3.6" stroke-linecap="round">
-                <path d="M18 33c-3 8-1 14-6.5 18"/>
-                <path d="M24 35c-2 9 0 15-4.5 19"/>
-                <path d="M30 36c-1 9 1 15-2 20"/>
-                <path d="M34 36c1 9-1 15 2 20"/>
-                <path d="M40 35c2 9 0 15 4.5 19"/>
-                <path d="M46 33c3 8 1 14 6.5 18"/>
-            </g>
-            <path class="m-body" d="M15 36C15 14 49 14 49 36Z"/>
-            <circle class="m-eye" cx="26" cy="26" r="4.7"/>
-            <circle class="m-eye" cx="38" cy="26" r="4.7"/>
-            <circle class="m-pupil" cx="27.2" cy="26.8" r="2.1"/>
-            <circle class="m-pupil" cx="39.2" cy="26.8" r="2.1"/>
-            <path class="m-mouth" d="M29 32.4q3 2.4 6 0" fill="none" stroke-width="1.8"
-                  stroke-linecap="round"/>
+            <image href="assets/mascotte.png" width="64" height="64"/>
         </symbol>
     </svg>
 

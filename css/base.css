@@ -488,30 +488,29 @@ label { font-size: 0.74rem; color: var(--text-dim); }
 
 /* ------------------------------------------------------------------ mascotte
 
-   Le tracé vit dans index.html, référencé par <use>. Ses couleurs viennent d'ici
-   pour suivre le thème, et les tentacules ondulent doucement. */
+   Le <symbol> vit dans index.html, référencé par <use>. C'est une image peinte :
+   ses couleurs lui appartiennent et ne viennent plus d'ici. Une mascotte garde
+   son identité d'un thème à l'autre, et celle-ci a de quoi se détacher des deux
+   fonds — un contour marine pour le clair, un corps bleu pour le sombre.
 
-.m-body { fill: var(--accent); }
-.m-arms { stroke: var(--accent); }
-.m-eye { fill: var(--surface-2); }
-.m-pupil { fill: var(--text); }
-.m-mouth { stroke: var(--accent-ink); opacity: 0.55; }
+   Elle flotte sur l'écran de chargement. L'ondulation des tentacules a disparu
+   avec le tracé : elle animait chaque bras séparément, ce qu'une image ne
+   permet pas. */
 
-.boot-mascot { width: 76px; height: 76px; margin-bottom: 2px; }
-.boot-mascot .m-arms { animation: mascot-wave 2.8s ease-in-out infinite; transform-origin: 32px 34px; }
-.boot-mascot { animation: mascot-bob 3.4s ease-in-out infinite; }
+.boot-mascot {
+    width: 76px;
+    height: 76px;
+    margin-bottom: 2px;
+    animation: mascot-bob 3.4s ease-in-out infinite;
+}
 
 @keyframes mascot-bob {
     0%, 100% { transform: translateY(0); }
     50% { transform: translateY(-5px); }
 }
-@keyframes mascot-wave {
-    0%, 100% { transform: scaleY(1); }
-    50% { transform: scaleY(0.92); }
-}
 
 @media (prefers-reduced-motion: reduce) {
-    .boot-mascot, .boot-mascot .m-arms { animation: none; }
+    .boot-mascot { animation: none; }
     .view.scrollable { scroll-behavior: auto; }
 }
 #boot .sub { font-size: 0.8rem; color: var(--text-dim); max-width: 420px; line-height: 1.5; }
