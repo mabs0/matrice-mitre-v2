@@ -428,8 +428,11 @@ function paint(app) {
     let highlighted = null;
     if (view.cve?.connue) {
         // Les techniques parentes des sous-techniques sont déjà dans les listes,
-        // posées à la génération du fichier : ici il n'y a qu'à réunir.
-        highlighted = new Set(view.cve.direct);
+        // posées à la génération du fichier : ici il n'y a qu'à réunir. Vérifiées
+        // et directes sont deux catégories de lien établi vers la vulnérabilité
+        // elle-même : les deux s'allument sans condition, seules les héritées
+        // — un lien de famille — dépendent de l'interrupteur.
+        highlighted = new Set([...view.cve.verifiees, ...view.cve.direct]);
         if (view.cveHeritees) for (const id of view.cve.heritees) highlighted.add(id);
     } else if (view.highlight) {
         highlighted = new Set(data.mitigationById.get(view.highlight)?.techniques ?? []);
@@ -666,13 +669,16 @@ function paintCve(app, erreur = "") {
         return;
     }
 
-    const total = cve.direct.length + (view.cveHeritees ? cve.heritees.length : 0);
+    const total = cve.verifiees.length + cve.direct.length + (view.cveHeritees ? cve.heritees.length : 0);
     hote.innerHTML = `
         <p class="cve-bilan">
             <b>${esc(cve.id)}</b>
             <span>${total} technique${total > 1 ? "s" : ""} en surbrillance</span>
         </p>
         <ul class="cve-detail">
+            ${cve.verifiees.length ? `<li><span class="cve-pastille verifiee"></span>
+                ${cve.verifiees.length} vérifiée${cve.verifiees.length > 1 ? "s" : ""}, établie${cve.verifiees.length > 1 ? "s" : ""}
+                à la main par le MITRE pour cette CVE précisément</li>` : ""}
             <li><span class="cve-pastille directe"></span>
                 ${cve.direct.length} directe${cve.direct.length > 1 ? "s" : ""}, depuis la faiblesse
                 que le NVD attribue à cette CVE</li>

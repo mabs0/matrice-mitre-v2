@@ -4,7 +4,8 @@
 # fichiers statiques servis par GitHub Pages : il n'y a pas de serveur derrière,
 # et la politique de sécurité de la page interdit toute sortie réseau
 # (`connect-src 'none'`). Un bouton dans le navigateur ne peut donc ni lancer un
-# script Node, ni télécharger les 217 Mo de flux du NVD, ni réécrire un fichier
+# script Node, ni télécharger les 217 Mo de flux du NVD (plus, désormais, le
+# CSV du Center for Threat-Informed Defense du MITRE), ni réécrire un fichier
 # du dépôt. Ce qui peut faire les trois, c'est ceci.
 #
 # Le bouton existe quand même : `workflow_dispatch` en pose un dans l'onglet

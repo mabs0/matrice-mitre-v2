@@ -162,6 +162,12 @@
 }
 .cve-pastille.heritee { background: none; border: 1px solid var(--text-mute); }
 .cve-detail li.coupee .cve-pastille.heritee { border-style: dashed; }
+/* La vérifiée reprend la couleur de la directe — c'est la même famille, « un
+   lien établi vers la vulnérabilité » — mais avec un halo : c'est la seule des
+   trois qu'un analyste a posée à la main, CVE par CVE, plutôt qu'une jointure
+   automatique. Le halo dit ce supplément sans ajouter de couleur au sujet, déjà
+   pris par les niveaux de maturité ailleurs dans la page. */
+.cve-pastille.verifiee { box-shadow: 0 0 0 2px var(--accent-wash); }
 
 .cve-vide { color: var(--text-mute); }
 .cve-fraicheur { margin-top: 9px; padding-top: 8px; border-top: 1px solid var(--border); }
@@ -328,6 +334,20 @@
         grid-template-rows: minmax(0, auto) minmax(160px, 1fr) minmax(0, auto);
         overflow-y: auto;
     }
+}
+
+/* ------------------------------------------------- tableau de bord, écran moyen
+
+   Entre le seuil mobile (900px, ci-dessous) et un grand écran, la colonne de
+   gauche gardait sa largeur de confort de 372px alors qu'elle n'a besoin que
+   de rester lisible — et c'est justement la zone où ça manque le plus : un
+   portable de bureau classique (1366×768) mis à l'échelle à 125 ou 150 % par
+   Windows, très courant, retombe autour de 900-1100px de large effectifs. On
+   resserre donc la colonne à son plancher de lisibilité mesuré (350px, voir
+   plus haut) pour rendre à la matrice ce qui peut l'être, sans rien retirer :
+   au-delà elle continue de défiler horizontalement, à dessein. */
+@media (min-width: 901px) and (max-width: 1300px) {
+    #dash { grid-template-columns: 350px minmax(0, 1fr); gap: 8px; padding: 8px; }
 }
 
 /* ------------------------------------------------- le tableau de bord au doigt

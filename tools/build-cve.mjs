@@ -63,7 +63,7 @@
    l'interface le dit plutôt que de laisser croire à une base vivante. */
 
 import { writeFileSync, readFileSync, existsSync, mkdirSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { gunzipSync, inflateRawSync } from "node:zlib";
 import { resolve } from "node:path";
 
@@ -74,6 +74,62 @@ const NVD_FLUX = annee => `https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-${
 // aussi tout ce qui précède.
 const PREMIER_FLUX = 2002;
 const OUT = fileURLToPath(new URL("../js/cve-data.js", import.meta.url));
+
+/* --------------------------------------------------------- la troisième catégorie
+
+   Le chemin CWE -> CAPEC -> ATT&CK est automatique, et sur la CVE moyenne il ne
+   trouve qu'un lien de famille : c'est ce que `herite` documente ci-dessus. Il
+   existe une seule source où le lien est posé à la main, CVE par CVE, par des
+   analystes — le Center for Threat-Informed Defense du MITRE, projet « Mapping
+   ATT&CK to CVE for Impact ». Le jeu de données qui en sort est archivé et
+   petit (environ 850 CVE, 2008-2020) : il ne remplace rien, mais pour les CVE
+   qu'il couvre, c'est la seule catégorie du fichier qui décrit vraiment la
+   vulnérabilité et non sa famille. On le garde donc à part, sous le nom
+   `verifiee`, au-dessus de `direct` dans l'ordre de confiance. */
+
+const CTID_URL = "https://raw.githubusercontent.com/center-for-threat-informed-defense/"
+    + "attack_to_cve/master/Att%26ckToCveMappings.csv";
+
+/**
+ * Les techniques établies à la main par le CTID, par CVE.
+ *
+ * Le CSV porte quatre colonnes de techniques (impact primaire, secondaire,
+ * technique d'exploitation, non classée) : les quatre sont un lien réel posé
+ * par un analyste, la colonne ne fait que dire à quel titre. On les réunit
+ * sans les distinguer plus — l'interface n'a qu'une question à répondre,
+ * « est-ce vérifié ? ».
+ *
+ * Deux précautions que le CSV, sorti d'une recherche de 2020-2021, rend
+ * nécessaires. D'abord des doublons : une CVE reprise entre les deux phases du
+ * projet a une ligne par phase, à réunir. Ensuite des identifiants obsolètes :
+ * l'ATT&CK de l'époque n'est plus celui d'aujourd'hui, une poignée de
+ * techniques citées ont depuis été retirées ou renumérotées. On ne garde que
+ * celles qui existent encore dans le référentiel embarqué — une technique
+ * qu'on ne peut pas placer dans la matrice n'apprendrait rien, elle
+ * planterait le surlignage.
+ */
+export function verifieesDuCsv(csv, techniquesValides) {
+    const lignes = csv.replace(/^﻿/, "").split(/\r?\n/).filter(Boolean);
+    const out = new Map();
+    for (const ligne of lignes.slice(1)) {
+        const champs = ligne.split(",");
+        const id = champs[0]?.trim();
+        if (!/^CVE-\d{4}-\d+$/.test(id ?? "")) continue;
+
+        const techniques = out.get(id) ?? new Set();
+        for (const champ of champs.slice(1, 5)) {
+            for (const brut of champ.split(";")) {
+                const t = brut.trim();
+                if (!t || !techniquesValides.has(t)) continue;
+                techniques.add(t);
+                const parent = t.split(".")[0];
+                if (techniquesValides.has(parent)) techniques.add(parent);
+            }
+        }
+        if (techniques.size) out.set(id, techniques);
+    }
+    return out;
+}
 
 /* ------------------------------------------------------------ téléchargement */
 
@@ -229,6 +285,15 @@ export function techniquesDeCwes(cwes, table) {
 
 /* ------------------------------------------------------------- programme */
 
+/* Le corps ci-dessous ne s'exécute que si ce fichier est lancé directement.
+   `verifieesDuCsv` (et les autres fonctions exportées plus haut) sont
+   importées par le banc d'essai : sans ce garde-fou, l'importer déclencherait
+   le téléchargement des flux du NVD — 217 Mo — au fil de l'exécution des
+   tests. Même principe que dans tools/build-attack.mjs. */
+if (import.meta.url !== pathToFileURL(process.argv[1] ?? "").href) {
+    // Importé comme module : rien à faire.
+} else {
+
 const argFlux = process.argv.indexOf("--flux");
 const dossierFlux = argFlux !== -1 ? process.argv[argFlux + 1] : null;
 if (argFlux !== -1 && !dossierFlux) throw new Error("--flux attend un chemin de dossier");
@@ -246,6 +311,17 @@ console.log(`  ${capecTech.size} CAPEC sur ${capecTotal} portent une corresponda
 
 const { table: parCwe, cwes: cweTotal } = cweVersTechniques(cweXml, capecTech);
 console.log(`  ${parCwe.size} CWE sur ${cweTotal} mènent à au moins une technique`);
+
+console.log("Mappings CTID (MITRE Center for Threat-Informed Defense)…");
+// Le référentiel embarqué, pas un flux : c'est lui qui dit quelles techniques
+// existent encore aujourd'hui, et donc lesquelles d'un CSV de 2020-2021 sont
+// encore valables. `js/attack-data.js` est justement du JSON posé dans un
+// module — l'import ne coûte rien et ne télécharge rien.
+const { default: attackData } = await import(new URL("../js/attack-data.js", import.meta.url));
+const techniquesValides = new Set(attackData.techniques.flatMap(t => [t.id, ...t.subs.map(s => s.id)]));
+const ctidCsv = (await telecharger(CTID_URL)).toString("utf8");
+const verifieParCve = verifieesDuCsv(ctidCsv, techniquesValides);
+console.log(`  ${verifieParCve.size} CVE avec au moins une technique vérifiée à la main`);
 
 /* --- lecture des millésimes --- */
 
@@ -277,19 +353,27 @@ for (const annee of millesimes) {
     const flux = JSON.parse(gunzipSync(brut).toString("utf8"));
     for (const { cve } of flux.vulnerabilities ?? []) {
         luesTotal++;
+        const verifiees = verifieParCve.get(cve.id);
         const cwes = cwesDuCve(cve);
-        if (!cwes.length) { sansCwe++; continue; }
+        if (!cwes.length && !verifiees) { sansCwe++; continue; }
 
-        const { direct, herite } = techniquesDeCwes(cwes, parCwe);
-        if (!direct.length && !herite.length) continue;
+        const { direct: directBrut, herite: heriteBrut } = techniquesDeCwes(cwes, parCwe);
+        // La catégorie vérifiée l'emporte sur les deux autres : une technique
+        // qu'un analyste a posée à la main n'a plus besoin d'être redite comme
+        // « seulement directe » ou « seulement héritée ». Même logique que
+        // `direct` qui l'emporte déjà sur `herite` dans `techniquesDeCwes`.
+        const direct = verifiees ? directBrut.filter(t => !verifiees.has(t)) : directBrut;
+        const herite = verifiees ? heriteBrut.filter(t => !verifiees.has(t)) : heriteBrut;
+        const verifiee = verifiees ? [...verifiees].sort() : [];
+        if (!verifiee.length && !direct.length && !herite.length) continue;
 
         const m = /^CVE-(\d{4})-(\d+)$/.exec(cve.id);
         if (!m) continue;                       // identifiant hors forme : on ne l'indexe pas
         if (!parAnnee.has(m[1])) parAnnee.set(m[1], []);
-        parAnnee.get(m[1]).push([Number(m[2]), direct, herite]);
+        parAnnee.get(m[1]).push([Number(m[2]), verifiee, direct, herite]);
     }
 }
-console.log(`\n${luesTotal} CVE lues, ${sansCwe} sans CWE exploitable`);
+console.log(`\n${luesTotal} CVE lues, ${sansCwe} sans CWE exploitable ni mapping vérifié`);
 
 /* --- encodage --- */
 
@@ -308,19 +392,21 @@ const couples = [];
 const years = {};
 let indexees = 0;
 
+let indexeesVerifiees = 0;
 for (const [annee, liste] of [...parAnnee].sort()) {
     const seaux = new Map();
-    for (const [num, direct, herite] of liste) {
-        const cle = `${direct.join(",")}|${herite.join(",")}`;
+    for (const [num, verifiee, direct, herite] of liste) {
+        const cle = `${verifiee.join(",")}~${direct.join(",")}|${herite.join(",")}`;
         let i = rangCouple.get(cle);
         if (i === undefined) {
             i = couples.length;
             rangCouple.set(cle, i);
-            couples.push([direct.map(rang), herite.map(rang)]);
+            couples.push([verifiee.map(rang), direct.map(rang), herite.map(rang)]);
         }
         if (!seaux.has(i)) seaux.set(i, []);
         seaux.get(i).push(num);
         indexees++;
+        if (verifiee.length) indexeesVerifiees++;
     }
     const obj = {};
     for (const [i, nums] of [...seaux].sort((a, b) => a[0] - b[0])) obj[i] = nums.sort((a, b) => a - b);
@@ -330,14 +416,17 @@ for (const [annee, liste] of [...parAnnee].sort()) {
 const data = {
     generated: new Date().toISOString(),
     cwe: versionCwe,
-    counts: { read: luesTotal, indexed: indexees, sets: couples.length, techniques: techniques.length },
+    counts: {
+        read: luesTotal, indexed: indexees, verified: indexeesVerifiees,
+        sets: couples.length, techniques: techniques.length,
+    },
     techniques,
     sets: couples,
     years,
 };
 
-console.log(`${indexees} CVE menant à au moins une technique`);
-console.log(`${couples.length} couples (direct, hérité) distincts, ${techniques.length} techniques citées`);
+console.log(`${indexees} CVE menant à au moins une technique, dont ${indexeesVerifiees} avec une part vérifiée`);
+console.log(`${couples.length} triplets (vérifié, direct, hérité) distincts, ${techniques.length} techniques citées`);
 
 /* Comme pour attack-data.js : le JSON est posé dans une chaîne plutôt qu'en
    littéral d'objet, `JSON.parse` étant nettement plus rapide que l'analyse du
@@ -347,15 +436,18 @@ const charge = JSON.stringify(data).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
 writeFileSync(OUT, `/* Généré par tools/build-cve.mjs — ne pas modifier à la main.
 
    Table « CVE -> techniques ATT&CK », dérivée le ${data.generated}
-   de trois publications officielles : les flux JSON 2.0 du NVD, le catalogue
-   CWE v${versionCwe} et le catalogue CAPEC.
+   de quatre publications officielles : les flux JSON 2.0 du NVD, le catalogue
+   CWE v${versionCwe}, le catalogue CAPEC, et les mappings vérifiés à la main du
+   Center for Threat-Informed Defense du MITRE (« Mapping ATT&CK to CVE for
+   Impact », ${verifieParCve.size} CVE couvertes, 2008-2020).
 
-   ${indexees} CVE indexées sur ${luesTotal} lues, réparties en ${couples.length} couples
-   (techniques directes, techniques héritées) et ${techniques.length} techniques citées.
+   ${indexees} CVE indexées sur ${luesTotal} lues, dont ${indexeesVerifiees} avec au moins une
+   technique vérifiée à la main. Réparties en ${couples.length} triplets (techniques
+   vérifiées, directes, héritées) et ${techniques.length} techniques citées.
 
    Ce fichier n'est pas chargé au démarrage : js/cve.js l'importe à la première
-   CVE saisie. Voir l'en-tête de tools/build-cve.mjs pour la chaîne de jointure
-   et pour ce que « hérité » veut dire.
+   CVE saisie. Voir l'en-tête de tools/build-cve.mjs pour la chaîne de jointure,
+   et pour ce que « vérifié », « direct » et « hérité » veulent dire.
 
    Pour régénérer :  node tools/build-cve.mjs */
 export default JSON.parse('${charge}');
@@ -363,3 +455,5 @@ export default JSON.parse('${charge}');
 
 const octets = readFileSync(OUT).length;
 console.log(`\n${OUT} — ${(octets / 1048576).toFixed(2)} Mo`);
+
+}

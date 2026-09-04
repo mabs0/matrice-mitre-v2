@@ -5,21 +5,27 @@
    techniques et ne touche à rien d'autre. C'est `views/matrix.js` qui décide de
    ce qu'il en fait.
 
-   ------------------------------------------------------- direct et hérité
+   -------------------------------------------------- trois niveaux de confiance
 
    Le NVD attribue à une CVE le CWE le plus précis qu'il connaisse. Ce CWE-là ne
    mène souvent nulle part dans ATT&CK ; ses ancêtres, si. Le fichier de données
-   garde donc les deux séparés :
+   garde donc trois listes séparées, de la plus sûre à la plus large :
 
-     - `direct` : les techniques du CWE réellement attribué. C'est un lien
-       établi, de la vulnérabilité vers la technique.
+     - `verifiees` : posées à la main, CVE par CVE, par le Center for
+       Threat-Informed Defense du MITRE. La source la plus fiable qui existe,
+       mais elle ne couvre qu'environ 850 CVE (2008-2020) — voir l'en-tête de
+       `tools/build-cve.mjs`.
+     - `direct` : les techniques du CWE réellement attribué par le NVD. C'est un
+       lien établi, de la vulnérabilité vers la technique, mais automatique.
      - `heritees` : celles qui ne viennent que d'un ancêtre du CWE, c'est-à-dire
-       d'une famille de faiblesses. Deux tiers des CVE n'obtiennent une technique
-       que par ce chemin, et ce qu'il désigne est réel mais large.
+       d'une famille de faiblesses. La plupart des CVE qui obtiennent une
+       technique ne l'obtiennent que par ce chemin, et ce qu'il désigne est réel
+       mais large.
 
-   Les mélanger reviendrait à faire passer une parenté lointaine pour une
-   caractérisation. L'interface montre les deux, distinctement, et laisse couper
-   les secondes.
+   Les mélanger reviendrait à faire passer une parenté lointaine — voire une
+   famille entière — pour une caractérisation établie. L'interface montre les
+   trois, distinctement, et ne laisse couper que la dernière : les deux
+   premières sont déjà un lien réel vers la vulnérabilité elle-même.
 
    ---------------------------------------------------------------- le poids
 
@@ -91,7 +97,7 @@ function indexDe(annee) {
  * @param {string} saisie ce que le répondant a collé
  * @returns {Promise<null | {
  *   id: string, connue: boolean, horsPerimetre: boolean,
- *   direct: string[], heritees: string[]
+ *   verifiees: string[], direct: string[], heritees: string[]
  * }>} null si la saisie n'est pas une CVE du tout
  *
  * `connue: false` couvre deux cas qu'on ne peut pas distinguer sans embarquer
@@ -108,15 +114,18 @@ export async function techniquesDeCve(saisie) {
 
     const [, annee, numero] = /^CVE-(\d{4})-(\d+)$/.exec(id);
     const carte = indexDe(annee);
-    const vide = { id, connue: false, horsPerimetre: !carte, direct: [], heritees: [] };
+    const vide = { id, connue: false, horsPerimetre: !carte, verifiees: [], direct: [], heritees: [] };
     if (!carte) return vide;
 
     const couple = carte.get(Number(numero));
     if (couple === undefined) return vide;
 
-    const [direct, heritees] = donnees.sets[couple];
+    const [verifiees, direct, heritees] = donnees.sets[couple];
     const nom = i => donnees.techniques[i];
-    return { id, connue: true, horsPerimetre: false, direct: direct.map(nom), heritees: heritees.map(nom) };
+    return {
+        id, connue: true, horsPerimetre: false,
+        verifiees: verifiees.map(nom), direct: direct.map(nom), heritees: heritees.map(nom),
+    };
 }
 
 /** Ce que la table couvre, pour le dire dans l'interface plutôt que de le taire. */

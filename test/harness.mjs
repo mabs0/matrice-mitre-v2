@@ -124,11 +124,12 @@ writeFileSync(`${APP}/js/attack-data.js`,
 const CVE_ESSAI = {
     generated: "2026-09-02T00:00:00.000Z",
     cwe: "4.20",
-    counts: { read: 2, indexed: 2, sets: 2, techniques: 4 },
+    counts: { read: 2, indexed: 2, verified: 1, sets: 2, techniques: 4 },
     techniques: ["T1078", "T1078.001", "T1110", "T1555"],
+    // Triplet (vérifiée, directe, héritée) par CVE.
     sets: [
-        [[0, 1], [2]],      // CVE-2021-44228 : deux directes, une héritée
-        [[], [3]],          // CVE-2021-45046 : rien en direct, une héritée
+        [[3], [0, 1], [2]], // CVE-2021-44228 : une vérifiée, deux directes, une héritée
+        [[], [], [3]],      // CVE-2021-45046 : rien en direct ni vérifié, une héritée
     ],
     years: { 2021: { 0: [44228], 1: [45046] } },
 };
@@ -1526,11 +1527,13 @@ window.document.getElementById("brand").click();
     /* --- l'icône d'onglet --- */
 
     ok("le document déclare une icône",
-       /<link rel="icon" href="favicon\.svg" type="image\/svg\+xml">/.test(html));
-    const icone = readFileSync(`${ROOT}/favicon.svg`, "utf8");
-    ok("c'est bien la mascotte, pas une image quelconque",
-       /<svg/.test(icone) && /circle/.test(icone) && icone.split("<path").length - 1 >= 6,
-       `${icone.split("<path").length - 1} tracés`);
+       /<link rel="icon" href="favicon\.png" type="image\/png"/.test(html));
+    const icone = readFileSync(`${ROOT}/favicon.png`);
+    // Signature PNG (89 50 4E 47 ...) plutôt qu'un contenu précis : la mascotte
+    // est un fichier binaire, pas un SVG dont on peut compter les tracés.
+    ok("c'est un PNG réel, pas un fichier vide ou d'un autre format",
+       icone.length > 512 && icone.subarray(0, 8).toString("hex") === "89504e470d0a1a0a",
+       `${icone.length} octets`);
 
     /* --- le haut de page : un titre court, une accroche courte --- */
 
@@ -2057,8 +2060,11 @@ console.log("\n[29] Mascotte");
     ok("elle est présente avant l'exécution du JavaScript", /#mascot/.test(bootBlock));
 
     const baseCss = readFileSync(`${ROOT}/css/base.css`, "utf8");
-    ok("ses couleurs suivent le thème",
-       /\.m-body\s*\{\s*fill:\s*var\(--/.test(baseCss) && /\.m-arms\s*\{\s*stroke:\s*var\(--/.test(baseCss));
+    // Depuis « poulpe », la mascotte est une image raster détourée
+    // (assets/mascotte.png), pas un tracé vectoriel : ses couleurs sont figées
+    // dans le fichier, il n'y a plus de `fill`/`stroke` à faire suivre le thème.
+    ok("l'image de la mascotte est bien celle qui est référencée partout",
+       /<image href="assets\/mascotte\.png"/.test(html));
     const reducedBase = /@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{([\s\S]*?)\n\}/.exec(baseCss)?.[1] ?? "";
     ok("son animation se coupe en mouvement réduit",
        /boot-mascot[^}]*animation:\s*none/.test(reducedBase), reducedBase.replace(/\s+/g, " ").trim());
@@ -2066,7 +2072,7 @@ console.log("\n[29] Mascotte");
     // Le symbole est bien résolu dans le document rendu.
     ok("le rendu résout la référence",
        !!window.document.querySelector('.brand-mascot use[href="#mascot"]') &&
-       !!window.document.querySelector("#mascot .m-body"));
+       !!window.document.querySelector("#mascot image"));
 }
 
 console.log("\n[30] Tenue sur écran étroit");
@@ -3813,6 +3819,29 @@ console.log("\n[46] Une CVE collée, des techniques allumées");
     ok("le fichier généré porte bien sa mise en garde de fraîcheur",
        /à la première\s+CVE saisie/.test(readFileSync(`${ROOT}/js/cve-data.js`, "utf8").slice(0, 1200)));
 
+    /* --- l'extraction des mappings vérifiés du CTID --- */
+    {
+        const { verifieesDuCsv } = await import(`${ROOT}/tools/build-cve.mjs`);
+        const valides = new Set(["T1078", "T1078.001", "T1110"]);
+        // BOM en tête (comme le vrai fichier), une CVE reprise sur deux lignes
+        // — une par phase du projet, à réunir —, une technique inconnue du
+        // référentiel embarqué (à rejeter) et une sous-technique dont la
+        // parente doit être ajoutée.
+        const csv = "﻿CVE ID,Primary Impact,Secondary Impact,Exploitation Technique,Uncategorized,Phase\n"
+            + "CVE-2019-0001,T1078,,,,Phase 2\n"
+            + "CVE-2019-0001,,,,T9999,Phase 1\n"
+            + "CVE-2019-0002,,,T1078.001,,Phase 2\n";
+        const out = verifieesDuCsv(csv, valides);
+        ok("les deux lignes d'une même CVE, une par phase, sont réunies",
+           [...(out.get("CVE-2019-0001") ?? [])].sort().join(",") === "T1078",
+           [...(out.get("CVE-2019-0001") ?? [])].join(","));
+        ok("une technique absente du référentiel embarqué est rejetée sans faire planter le reste",
+           !out.get("CVE-2019-0001")?.has("T9999"));
+        ok("une sous-technique vérifiée ajoute sa technique parente",
+           [...(out.get("CVE-2019-0002") ?? [])].sort().join(",") === "T1078,T1078.001",
+           [...(out.get("CVE-2019-0002") ?? [])].sort().join(","));
+    }
+
     /* --- la reconnaissance de la saisie --- */
     const { normaliserCve } = await import(`${APP}/js/cve.js`);
     for (const [saisie, attendu] of [
@@ -3855,14 +3884,18 @@ console.log("\n[46] Une CVE collée, des techniques allumées");
     await taper("CVE-2021-44228");
     ok("la CVE est reconnue et son bilan s'affiche", /CVE-2021-44228/.test(note()), note().slice(0, 60));
     ok("les techniques directes s'allument", allumee("T1078"), classesDe("T1078").join(" "));
-    ok("les autres s'éteignent", eteinte("T1555"), classesDe("T1555").join(" "));
+    ok("la technique vérifiée s'allume aussi, sans dépendre de l'interrupteur des héritées",
+       allumee("T1555"), classesDe("T1555").join(" "));
+    ok("une technique qui n'est liée d'aucune des trois façons s'éteint",
+       eteinte("T9999"), classesDe("T9999").join(" "));
     /* Le point qui compte : héritées coupées, T1110 ne doit pas être allumée.
        C'est toute la différence entre « cette vulnérabilité permet ça » et
        « cette famille de faiblesses permet ça ». */
     ok("mais pas les héritées, puisque l'interrupteur est coupé",
        eteinte("T1110"), classesDe("T1110").join(" "));
     ok("le bilan dit combien il y en a de chaque sorte",
-       /2 directe/.test(note()) && /1 héritée/.test(note()), note().slice(0, 120));
+       /1 vérifiée/.test(note()) && /2 directe/.test(note()) && /1 héritée/.test(note()),
+       note().slice(0, 160));
     ok("et jusqu'où va la table, pour qu'on ne la croie pas vivante",
        /Table figée au/.test(note()), note().slice(-90));
 
