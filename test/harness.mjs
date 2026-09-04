@@ -3893,33 +3893,31 @@ console.log("\n[46] Une CVE collée, des techniques allumées");
        « cette famille de faiblesses permet ça ». */
     ok("mais pas les héritées, puisque l'interrupteur est coupé",
        eteinte("T1110"), classesDe("T1110").join(" "));
-    ok("le bilan dit combien il y en a de chaque sorte",
-       /1 vérifiée/.test(note()) && /2 directe/.test(note()) && /1 héritée/.test(note()),
-       note().slice(0, 160));
+    /* T1078.001 (une sous-technique) est dans les directes de cette CVE : sans
+       case à elle tant que les sous-techniques sont masquées, le compte se
+       détaille donc en « 1 technique et 1 sous-technique directes » plutôt
+       qu'en un « 2 directes » que rien ne viendrait expliquer. */
+    ok("le bilan dit combien il y en a de chaque sorte, détaillé dès qu'une sous-technique s'y cache",
+       /1 vérifiée/.test(note()) &&
+       /1 technique et 1 sous-technique directes/.test(note()) &&
+       /1 héritée/.test(note()),
+       note().slice(0, 220));
     ok("et jusqu'où va la table, pour qu'on ne la croie pas vivante",
        /Table figée au/.test(note()), note().slice(-90));
 
-    /* --- une sous-technique comptée mais sans case à qui s'allumer ---
-
-       T1078.001 est dans les directes de cette CVE, mais les sous-techniques
-       sont masquées par défaut : sa case n'existe pas, seule celle de T1078
-       (sa parente) s'allume. Sans le dire, « 2 directes » et une seule case
-       visiblement allumée se lirait comme un compte faux. */
+    /* --- la même sous-technique, une fois sa case affichée --- */
     const subsBox = window.document.getElementById("matrix-subs");
-    ok("une sous-technique du compte, sans case à elle, est signalée",
-       /1 sous-technique.*reste.*invisible/.test(note()), note().slice(-220));
-
     subsBox.checked = true;
     subsBox.dispatchEvent(new window.Event("change"));
     ok("sa case apparaît et s'allume une fois les sous-techniques affichées",
        allumee("T1078.001"), classesDe("T1078.001").join(" "));
-    ok("la mise en garde disparaît, il n'y a plus rien de masqué",
-       !/sous-technique/.test(note()), note().slice(-220));
+    ok("chaque technique ayant désormais sa case, le compte redevient simple",
+       /2 directes/.test(note()) && !/sous-technique/.test(note()), note().slice(0, 220));
 
     subsBox.checked = false;
     subsBox.dispatchEvent(new window.Event("change"));
-    ok("et revient quand on les recache",
-       /1 sous-technique.*reste.*invisible/.test(note()), note().slice(-220));
+    ok("et se détaille de nouveau une fois les sous-techniques recachées",
+       /1 technique et 1 sous-technique directes/.test(note()), note().slice(0, 220));
 
     bouton.click();
     ok("l'interrupteur allume les héritées", allumee("T1110"), classesDe("T1110").join(" "));

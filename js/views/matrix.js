@@ -679,13 +679,22 @@ function paintCve(app, erreur = "") {
     // Le compte porte sur les identifiants, sous-techniques comprises : c'est
     // ce qui est réellement établi. Mais la matrice, par défaut, ne montre pas
     // les sous-techniques : leur case n'existe pas, seule celle de leur
-    // technique parente s'allume. Sans le dire, « 5 directes » et deux cases
-    // allumées se lirait comme une erreur de compte, alors que ce n'en est pas
-    // une, simplement des sous-techniques sans case à elles sur cet écran.
-    const estSousTechnique = t => t.includes(".");
-    const masquees = view.showSubs ? 0
-        : [...cve.verifiees, ...cve.direct, ...(view.cveHeritees ? cve.heritees : [])]
-              .filter(estSousTechnique).length;
+    // technique parente s'allume. « 5 directes » et deux cases allumées se
+    // lirait comme une erreur de compte ; on distingue donc les deux dans le
+    // décompte lui-même plutôt que de laisser deviner, dès qu'il y a une
+    // sous-technique dans le lot. Une fois « Sous-techniques » coché, chacune a
+    // sa propre case et le compte simple redevient exact : plus besoin de le
+    // détailler.
+    const decompte = (liste, adjectif) => {
+        const n = liste.length;
+        const suffixe = n > 1 ? "s" : "";
+        if (view.showSubs) return `${n} ${adjectif}${suffixe}`;
+        const subs = liste.filter(t => t.includes(".")).length;
+        if (!subs) return `${n} ${adjectif}${suffixe}`;
+        const parentes = n - subs;
+        return `${parentes} technique${parentes > 1 ? "s" : ""}`
+            + ` et ${subs} sous-technique${subs > 1 ? "s" : ""} ${adjectif}${suffixe}`;
+    };
 
     hote.innerHTML = `
         <p class="cve-bilan">
@@ -694,20 +703,16 @@ function paintCve(app, erreur = "") {
         </p>
         <ul class="cve-detail">
             ${cve.verifiees.length ? `<li><span class="cve-pastille verifiee"></span>
-                ${cve.verifiees.length} vérifiée${cve.verifiees.length > 1 ? "s" : ""}, établie${cve.verifiees.length > 1 ? "s" : ""}
+                ${decompte(cve.verifiees, "vérifiée")}, établie${cve.verifiees.length > 1 ? "s" : ""}
                 à la main par le MITRE pour cette CVE précisément</li>` : ""}
             <li><span class="cve-pastille directe"></span>
-                ${cve.direct.length} directe${cve.direct.length > 1 ? "s" : ""}, depuis la faiblesse
+                ${decompte(cve.direct, "directe")}, depuis la faiblesse
                 que le NVD attribue à cette CVE</li>
             <li class="${view.cveHeritees ? "" : "coupee"}">
                 <span class="cve-pastille heritee"></span>
-                ${cve.heritees.length} héritée${cve.heritees.length > 1 ? "s" : ""}, depuis une famille
+                ${decompte(cve.heritees, "héritée")}, depuis une famille
                 de faiblesses plus large${view.cveHeritees ? "" : ", non comptées ici"}</li>
         </ul>
-        ${masquees ? `<p class="panel-note">
-            ${masquees} sous-technique${masquees > 1 ? "s" : ""} du compte ${masquees > 1 ? "restent" : "reste"}
-            invisible${masquees > 1 ? "s" : ""} : la case de sa technique parente porte la surbrillance
-            à sa place. Cochez « Sous-techniques », dans la barre d'outils, pour les voir séparément.</p>` : ""}
         ${view.cvePerimetre ? `<p class="panel-note cve-fraicheur">
             Table figée au ${esc(dateCourte(view.cvePerimetre.genere))} :
             une CVE publiée depuis n'y figure pas.</p>` : ""}`;
