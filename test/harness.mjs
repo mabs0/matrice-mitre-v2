@@ -1633,6 +1633,22 @@ window.document.getElementById("brand").click();
        /ni serveur/.test(faq[0]?.querySelector(".faq-answer")?.textContent ?? ""),
        faq[0]?.querySelector("summary")?.textContent);
 
+    // Même grammaire que les modules du tableau de bord : une seule réponse
+    // dépliée à la fois, ouvrir l'une referme l'autre. C'est le navigateur qui
+    // ouvre `<details>` au clic sur son `<summary>` et qui émet « toggle » —
+    // jsdom ne simule ni l'un ni l'autre, donc le banc les reproduit à la main
+    // pour éprouver le seul maillon qui est à nous : l'écouteur posé sur
+    // « toggle » qui referme les autres.
+    const deplier = d => { d.open = true; d.dispatchEvent(new window.Event("toggle")); };
+    deplier(faq[0]);
+    ok("déplier une question la marque ouverte", faq[0].open, String(faq[0].open));
+    deplier(faq[1]);
+    ok("en déplier une autre referme la première",
+       faq[1].open && !faq[0].open, `faq[0]=${faq[0].open} faq[1]=${faq[1].open}`);
+    faq[1].open = false;
+    ok("la refermer à la main ne rouvre rien d'autre",
+       [...faq].every(d => !d.open), [...faq].map(d => d.open).join(","));
+
     /* --- le pied de page --- */
 
     const pied = home.querySelector(".site-footer");

@@ -509,9 +509,10 @@
 /* La carte garde son encre propre quel que soit le thème (voir les jetons
    `--ink*`), pour le contraste qu'elle donne à la page. Mais en thème sombre,
    `--ink` est presque aussi noir que `--bg` : sans bordure, les quatre cartes
-   se distinguaient à peine du fond derrière elles. `--ink-border` — un blanc
-   translucide, déjà pensé pour se voir sur cette encre-là dans les deux thèmes
-   — la remplace en permanence plutôt que de n'apparaître qu'au survol. */
+   se distinguaient à peine du fond derrière elles. Une bordure blanche
+   translucide, permanente plutôt qu'au seul survol, corrige ça — plus marquée
+   que `--ink-border` (le liseré du pied de page, sur une bande bien plus
+   grande, n'a pas besoin de porter seul le contour de quatre cartes). */
 .benefit-card {
     position: relative;
     overflow: hidden;
@@ -520,7 +521,7 @@
     gap: 14px;
     padding: 22px;
     border-radius: var(--radius-lg);
-    border: 1px solid var(--ink-border);
+    border: 1px solid rgba(255, 255, 255, 0.18);
     background: var(--ink);
     color: var(--ink-text);
     box-shadow: var(--shadow-lg);

@@ -225,6 +225,17 @@ export function renderHome(app) {
         if (file) importFile(app, file);
     });
 
+    /* --- une seule question dépliée à la fois, même grammaire que les modules
+       du tableau de bord : ouvrir l'une referme les autres. --- */
+    for (const details of $$(".faq-item")) {
+        details.addEventListener("toggle", () => {
+            if (!details.open) return;
+            for (const autre of $$(".faq-item")) {
+                if (autre !== details) autre.open = false;
+            }
+        });
+    }
+
     suivreLePointeur();
 
     // Le chemin d'attaque se rejoue tant que l'accueil est à l'écran. Un rendu
