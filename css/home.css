@@ -655,9 +655,20 @@
 .faq-sign::after { transform: rotate(90deg); }
 .faq-item[open] .faq-sign { transform: rotate(135deg); }
 
-.faq-answer { padding: 0 18px 18px; }
+/* Le padding vit sur le paragraphe, pas sur `.faq-answer` : c'est ce dernier
+   que le script anime en hauteur (voir home.js) pour un dépli qui glisse
+   plutôt qu'un bloc qui apparaît d'un coup. Un padding posé directement dessus
+   aurait empêché sa hauteur de redescendre à zéro à la fermeture — une boîte
+   ne descend jamais sous son propre padding.
+
+   `height: auto` au repos : c'est l'état par défaut, celui que voit qui n'a
+   pas de JavaScript ou qui a demandé moins de mouvement — home.js pose alors
+   `details.open` sans jamais toucher à la hauteur. Le script ne prend la main
+   qu'en cours de dépli, avec une valeur en pixels le temps de la transition. */
+.faq-answer { height: auto; overflow: hidden; transition: height 0.28s ease; }
 .faq-answer p {
     margin: 0;
+    padding: 0 18px 18px;
     font-size: 0.85rem;
     line-height: 1.68;
     color: var(--text-dim);
@@ -785,9 +796,16 @@
 
 /* La toile a son propre ton, `--toile` : les couleurs de bordure sont bien trop
    discrètes ici. Les polygones de repère portent plus d'information que les
-   rayons, ils sont donc un peu plus marqués. */
-.ros-spoke { stroke: var(--toile); stroke-width: 0.9; opacity: 0.9; }
-.ros-web { fill: none; stroke: var(--toile); stroke-width: 1.2; }
+   rayons, ils sont donc un peu plus marqués.
+
+   `--toile` est déjà tenue tout près du plancher de lisibilité que le banc
+   impose (7:1 sur sa surface — en dessous, elle avait déjà disparu une fois,
+   voir tokens.css) : il ne reste presque plus de marge à gagner côté couleur.
+   L'opacité, elle, est un levier indépendant — le banc lit la couleur telle
+   qu'écrite dans la feuille de style, pas le rendu une fois mélangé au fond —
+   et adoucit le trait sans rouvrir ce risque-là. */
+.ros-spoke { stroke: var(--toile); stroke-width: 0.9; opacity: 0.6; }
+.ros-web { fill: none; stroke: var(--toile); stroke-width: 1.2; opacity: 0.55; }
 .ros-web-group { animation: ros-fade 0.5s ease-out both; }
 
 .ros-tick {
@@ -927,7 +945,7 @@
     .ros-web-group { animation: none; }
     .ros-shape { animation: none; stroke-dashoffset: 0; fill-opacity: 0.17; }
     .ros-dot { animation: none; opacity: 1; }
-    .action-card, .benefit-card, .faq-sign, .nav-link { transition: none; }
+    .action-card, .benefit-card, .faq-sign, .faq-answer, .nav-link { transition: none; }
 }
 
 /* La passe responsive complète viendra ensuite : un téléphone n'est pas un

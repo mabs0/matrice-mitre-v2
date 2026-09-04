@@ -225,17 +225,7 @@ export function renderHome(app) {
         if (file) importFile(app, file);
     });
 
-    /* --- une seule question dépliée à la fois, même grammaire que les modules
-       du tableau de bord : ouvrir l'une referme les autres. --- */
-    for (const details of $$(".faq-item")) {
-        details.addEventListener("toggle", () => {
-            if (!details.open) return;
-            for (const autre of $$(".faq-item")) {
-                if (autre !== details) autre.open = false;
-            }
-        });
-    }
-
+    brancherFaq();
     suivreLePointeur();
 
     // Le chemin d'attaque se rejoue tant que l'accueil est à l'écran. Un rendu
@@ -427,6 +417,55 @@ function faqSection(data) {
                 <div class="faq-list">${items}</div>
             </div>
         </section>`;
+}
+
+/* Une seule réponse dépliée à la fois — même grammaire que les modules du
+   tableau de bord, ouvrir l'une referme l'autre — et un dépli qui glisse au
+   lieu d'apparaître d'un coup.
+
+   `<details>` ne laisse pas la CSS seule s'en charger : tant que `open` n'est
+   pas posé, le contenu est en `display: none` par la feuille de style du
+   navigateur, et on ne transitionne pas depuis ça. Le clic sur `<summary>` est
+   donc intercepté ; c'est le script qui pose `open` et anime la hauteur entre
+   0 et la hauteur réelle du contenu, mesurée à la volée — jamais de valeur
+   devinée qui casserait si une réponse changeait de longueur. */
+function brancherFaq() {
+    const reduit = () => !!window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+
+    const ouvrir = (details, reponse) => {
+        details.open = true;
+        if (reduit()) return;
+        reponse.style.height = "0px";
+        reponse.style.transition = "none";
+        // Forcer le calcul de la mise en page avant de lire `scrollHeight` :
+        // sans lui, le navigateur peut encore raisonner sur l'état précédent.
+        reponse.offsetHeight;
+        const cible = reponse.scrollHeight;
+        reponse.style.transition = "";
+        reponse.style.height = `${cible}px`;
+        reponse.addEventListener("transitionend", () => { reponse.style.height = "auto"; }, { once: true });
+    };
+
+    const fermer = (details, reponse) => {
+        if (reduit()) { details.open = false; return; }
+        reponse.style.height = `${reponse.scrollHeight}px`;
+        reponse.offsetHeight;
+        reponse.style.height = "0px";
+        reponse.addEventListener("transitionend", () => { details.open = false; }, { once: true });
+    };
+
+    for (const details of $$(".faq-item")) {
+        const summary = details.querySelector("summary");
+        const reponse = details.querySelector(".faq-answer");
+        summary.onclick = e => {
+            e.preventDefault();
+            if (details.open) { fermer(details, reponse); return; }
+            for (const autre of $$(".faq-item")) {
+                if (autre !== details && autre.open) fermer(autre, autre.querySelector(".faq-answer"));
+            }
+            ouvrir(details, reponse);
+        };
+    }
 }
 
 /* Le pied de page reprend les sections de la barre haute : sur une page unique,

@@ -1633,21 +1633,52 @@ window.document.getElementById("brand").click();
        /ni serveur/.test(faq[0]?.querySelector(".faq-answer")?.textContent ?? ""),
        faq[0]?.querySelector("summary")?.textContent);
 
-    // Même grammaire que les modules du tableau de bord : une seule réponse
-    // dépliée à la fois, ouvrir l'une referme l'autre. C'est le navigateur qui
-    // ouvre `<details>` au clic sur son `<summary>` et qui émet « toggle » —
-    // jsdom ne simule ni l'un ni l'autre, donc le banc les reproduit à la main
-    // pour éprouver le seul maillon qui est à nous : l'écouteur posé sur
-    // « toggle » qui referme les autres.
-    const deplier = d => { d.open = true; d.dispatchEvent(new window.Event("toggle")); };
-    deplier(faq[0]);
-    ok("déplier une question la marque ouverte", faq[0].open, String(faq[0].open));
-    deplier(faq[1]);
+    /* --- une seule réponse dépliée à la fois, même grammaire que les modules
+       du tableau de bord --- */
+
+    // Le clic sur `<summary>` est intercepté par home.js, qui pose `open` lui-
+    // même — jsdom ne fait pas ce geste nativement, donc le tester revient à
+    // déclencher un vrai clic, pas à poser `open` à la main.
+    const cliquer = i => faq[i].querySelector("summary").dispatchEvent(
+        new window.Event("click", { bubbles: true, cancelable: true }));
+
+    // Sous « mouvement réduit », home.js pose `open` tout de suite plutôt que
+    // d'attendre la fin d'une transition CSS que jsdom ne joue jamais : c'est
+    // le chemin qu'on peut éprouver de bout en bout sans rien simuler de plus.
+    const reelMatchMedia = window.matchMedia;
+    window.matchMedia = () => ({ matches: true, addEventListener() {} });
+
+    cliquer(0);
+    ok("cliquer une question la déplie", faq[0].open, String(faq[0].open));
+    cliquer(1);
     ok("en déplier une autre referme la première",
        faq[1].open && !faq[0].open, `faq[0]=${faq[0].open} faq[1]=${faq[1].open}`);
-    faq[1].open = false;
+    cliquer(1);
     ok("la refermer à la main ne rouvre rien d'autre",
        [...faq].every(d => !d.open), [...faq].map(d => d.open).join(","));
+
+    // Hors « mouvement réduit », l'ouverture reste immédiate — c'est la
+    // fermeture qui attend la fin de la transition avant de retirer `open`,
+    // pour ne pas sortir le contenu de l'arbre avant que l'œil l'ait vu partir.
+    window.matchMedia = () => ({ matches: false, addEventListener() {} });
+    cliquer(0);
+    ok("l'ouverture ne dépend pas de la transition pour se voir dans le DOM",
+       faq[0].open, String(faq[0].open));
+    const reponse0 = faq[0].querySelector(".faq-answer");
+    ok("la hauteur cible est posée en pixels, prête à transitionner",
+       /^\d+px$/.test(reponse0.style.height), reponse0.style.height);
+    reponse0.dispatchEvent(new window.Event("transitionend"));
+    ok("la transition finie, la hauteur revient à « auto »",
+       reponse0.style.height === "auto", reponse0.style.height);
+
+    cliquer(0);
+    ok("la fermeture n'enlève pas « open » avant la fin de la transition",
+       faq[0].open, String(faq[0].open));
+    reponse0.dispatchEvent(new window.Event("transitionend"));
+    ok("puis elle referme, une fois la transition arrivée à son terme",
+       !faq[0].open, String(faq[0].open));
+
+    window.matchMedia = reelMatchMedia;
 
     /* --- le pied de page --- */
 
