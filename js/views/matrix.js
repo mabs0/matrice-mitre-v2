@@ -706,12 +706,10 @@ function paintCve(app, erreur = "") {
                 ${decompte(cve.verifiees, "vérifiée")}, établie${cve.verifiees.length > 1 ? "s" : ""}
                 à la main par le MITRE pour cette CVE précisément</li>` : ""}
             <li><span class="cve-pastille directe"></span>
-                ${decompte(cve.direct, "directe")}, depuis la faiblesse
-                que le NVD attribue à cette CVE</li>
+                ${decompte(cve.direct, "directe")}</li>
             <li class="${view.cveHeritees ? "" : "coupee"}">
                 <span class="cve-pastille heritee"></span>
-                ${decompte(cve.heritees, "héritée")}, depuis une famille
-                de faiblesses plus large${view.cveHeritees ? "" : ", non comptées ici"}</li>
+                ${decompte(cve.heritees, "héritée")}${view.cveHeritees ? "" : ", non comptées ici"}</li>
         </ul>
         ${view.cvePerimetre ? `<p class="panel-note cve-fraicheur">
             Table figée au ${esc(dateCourte(view.cvePerimetre.genere))} :
