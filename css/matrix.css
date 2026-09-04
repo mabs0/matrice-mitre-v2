@@ -70,6 +70,16 @@
 .dash-panel[data-panel="rosace"] .panel-body { overflow: visible; padding: 2px 2px 6px; }
 .dash-panel[data-panel="rosace"] .rosace { height: auto; width: 100%; }
 
+/* Le panneau CVE grandissait sans plafond avec ce qu'il affiche : une CVE
+   trouvée, vérifiée et détaillée peut y poser cinq lignes là où le champ vide
+   n'en tenait qu'une. `#dash-side` partage sa hauteur en trois lignes, et
+   seule celle des mitigations est élastique (`1fr`) — le bloc CVE prenait donc
+   sur elle d'abord, jusqu'à zéro, puis sur la rosace elle-même une fois les
+   mitigations à sec : c'est son bas qui se faisait rogner. Un plafond ici, et
+   le panneau défile chez lui plutôt que de déborder sur ses voisins — le
+   `overflow-y: auto` du panel-body, déjà posé plus haut, fait le reste. */
+.dash-panel[data-panel="cve"] { max-height: 260px; }
+
 .panel-note { margin: 0; font-size: 0.68rem; line-height: 1.5; color: var(--text-mute); }
 .panel-body #dash-cve { width: 100%; margin-bottom: 8px; }
 
