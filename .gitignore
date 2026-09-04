@@ -21,6 +21,6 @@ docs/
 .~lock.*#
 ~$*
 
-# Dépendances du banc d'essai (développement uniquement, le site n'en a aucune)
+# Dépendances du banc d'essai (développement uniquement, le site n'en a aucune).
+# `package-lock.json`, lui, est suivi : `npm ci` dans le workflow en a besoin.
 test/node_modules/
-test/package-lock.json

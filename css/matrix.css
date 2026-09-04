@@ -334,6 +334,16 @@
         grid-template-rows: minmax(0, auto) minmax(160px, 1fr) minmax(0, auto);
         overflow-y: auto;
     }
+
+    /* La matrice défile déjà verticalement quand la hauteur manque — c'est le
+       repli voulu, comme pour la largeur. Mais chaque case gardait son plancher
+       de pleine hauteur (30px) quel que soit l'espace disponible : sur un écran
+       bas, la colonne la plus longue imposait un défilement bien plus long que
+       nécessaire, pour des cases dont le texte tenait très bien en plus petit.
+       On resserre donc la grille elle-même, pas seulement la colonne de gauche —
+       c'est là que le manque de hauteur se faisait le plus sentir. */
+    #matrix-grid:not(.fit) .tactic-head { height: 42px; padding: 3px 5px; }
+    #matrix-grid:not(.fit) .cell { min-height: 24px; padding: 2px 5px; }
 }
 
 /* ------------------------------------------------- tableau de bord, écran moyen
