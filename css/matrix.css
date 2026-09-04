@@ -28,17 +28,28 @@
 
 #dash-side {
     display: grid;
-    /* La rosace et la liste des mitigations se partagent à égalité ce qui
-       reste une fois le bloc CVE posé sur sa hauteur propre (plafonnée plus
-       bas) — chacune a un plancher, aucune des deux ne peut retomber à rien.
-       La rosace en particulier tient toujours la hauteur exacte de sa ligne,
-       pas celle que son contenu réclame : c'est ce qui la fait dépendre de la
-       case plutôt que l'inverse, et se centrer avec des marges égales quelle
-       que soit cette hauteur (voir plus bas, `.rosace { height: 100% }`). */
-    grid-template-rows: minmax(220px, 1fr) minmax(0, 1fr) auto;
+    /* La rosace reste toujours affichée, assez grande pour lire les tactiques :
+       mitigations et CVE sont repliées par défaut, réduites à leur en-tête
+       (`auto`), et la rosace prend tout le reste. Ouvrir l'une des deux (voir
+       `#dash-side[data-open]` plus bas) lui cède une partie de cette place,
+       jamais plus d'une à la fois — c'est tout l'intérêt de replier : garder de
+       la place pour d'autres modules à l'avenir sans jamais la disputer à
+       trois ou quatre en même temps.
+
+       La rosace tient toujours la hauteur exacte de sa ligne, pas celle que son
+       contenu réclame : c'est ce qui la fait dépendre de la case plutôt que
+       l'inverse, et se centrer avec des marges égales quelle que soit cette
+       hauteur (voir plus bas, `.rosace { height: 100% }`). */
+    grid-template-rows: minmax(280px, 1fr) auto auto;
     gap: 10px;
     min-height: 0;
 }
+/* L'un des deux dépliables ouvert : il reçoit sa propre ligne élastique,
+   l'autre reste réduit à son en-tête. La rosace cède une part de la place
+   mais garde son plancher — jamais moins que ce qu'il faut pour lire les
+   tactiques. */
+#dash-side[data-open="mitigations"] { grid-template-rows: minmax(240px, 1fr) minmax(160px, 1fr) auto; }
+#dash-side[data-open="cve"] { grid-template-rows: minmax(240px, 1fr) auto minmax(160px, 1fr); }
 
 .dash-panel {
     display: flex;
@@ -82,15 +93,31 @@
 .dash-panel[data-panel="rosace"] .rosace-figure { width: 100%; height: 100%; min-height: 0; }
 .dash-panel[data-panel="rosace"] .rosace { height: 100%; width: 100%; }
 
-/* Le panneau CVE grandissait sans plafond avec ce qu'il affiche : une CVE
-   trouvée, vérifiée et détaillée peut y poser cinq lignes là où le champ vide
-   n'en tenait qu'une. `#dash-side` partage sa hauteur en trois lignes, et
-   seule celle des mitigations est élastique (`1fr`) — le bloc CVE prenait donc
-   sur elle d'abord, jusqu'à zéro, puis sur la rosace elle-même une fois les
-   mitigations à sec : c'est son bas qui se faisait rogner. Un plafond ici, et
-   le panneau défile chez lui plutôt que de déborder sur ses voisins — le
-   `overflow-y: auto` du panel-body, déjà posé plus haut, fait le reste. */
-.dash-panel[data-panel="cve"] { max-height: 260px; }
+/* Un panneau repliable partage l'apparence de `.panel-head` — c'en est un,
+   promu bouton. Au clic, il ouvre son propre corps et referme l'autre : un
+   seul dépliable à la fois, pour que la rosace garde toujours l'essentiel de
+   la place (voir `#dash-side[data-open]` plus haut). */
+.accordion-head {
+    width: 100%;
+    background: none;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+@media (hover: hover) { .accordion-head:hover h2 { color: var(--text); } }
+.accordion-head .ico-chevron {
+    flex: 0 0 auto;
+    width: 13px;
+    height: 13px;
+    color: var(--text-mute);
+    transition: transform 0.18s ease;
+}
+/* Repliée, la ligne « auto » de `#dash-side` réduit le panneau à cet en-tête :
+   son corps n'a plus besoin d'occuper de l'espace, `.hidden` s'en charge (posé
+   et retiré par `toggleAccordion`, dans matrix.js). */
+.accordion-head[aria-expanded="true"] .ico-chevron { transform: rotate(180deg); }
 
 .panel-note { margin: 0; font-size: 0.68rem; line-height: 1.5; color: var(--text-mute); }
 .panel-body #dash-cve { width: 100%; margin-bottom: 8px; }
@@ -221,25 +248,21 @@
 .panel-expand .ico-close { display: none; }
 
 #dash[data-expanded="rosace"] [data-expand="rosace"] .ico-grow,
-#dash[data-expanded="mitigations"] [data-expand="mitigations"] .ico-grow,
 #dash[data-expanded="matrix"] [data-expand="matrix"] .ico-grow { display: none; }
 #dash[data-expanded="rosace"] [data-expand="rosace"] .ico-close,
-#dash[data-expanded="mitigations"] [data-expand="mitigations"] .ico-close,
 #dash[data-expanded="matrix"] [data-expand="matrix"] .ico-close { display: block; }
 
-/* Un panneau agrandi prend toute la grille ; les autres sortent du flux plutôt
-   que de se réduire à rien. */
+/* Un panneau agrandi prend toute la grille ; l'autre sort du flux plutôt que
+   de se réduire à rien. Mitigations et CVE n'ont plus ce bouton — elles se
+   replient sur place (`#dash-side[data-open]` plus haut) plutôt que de
+   prendre tout l'écran, la rosace, elle, reste digne d'y occuper la place. */
 #dash[data-expanded] { grid-template-columns: minmax(0, 1fr); }
 #dash[data-expanded="matrix"] #dash-side,
-#dash[data-expanded="rosace"] [data-panel="matrix"],
-#dash[data-expanded="mitigations"] [data-panel="matrix"] { display: none; }
+#dash[data-expanded="rosace"] [data-panel="matrix"] { display: none; }
 
-#dash[data-expanded="rosace"] #dash-side,
-#dash[data-expanded="mitigations"] #dash-side { grid-template-rows: minmax(0, 1fr); }
+#dash[data-expanded="rosace"] #dash-side { grid-template-rows: minmax(0, 1fr); }
 #dash[data-expanded="rosace"] [data-panel="mitigations"],
-#dash[data-expanded="rosace"] [data-panel="cve"],
-#dash[data-expanded="mitigations"] [data-panel="rosace"],
-#dash[data-expanded="mitigations"] [data-panel="cve"] { display: none; }
+#dash[data-expanded="rosace"] [data-panel="cve"] { display: none; }
 
 /* En grand, la rosace occupe la surface au lieu de rester à sa taille de
    vignette — c'est tout l'intérêt de l'agrandir.
@@ -344,18 +367,20 @@
    panneau avec lequel on navigue dans l'évaluation : le tableau de bord était
    inutilisable sur un portable, et c'est ce qui a été remonté.
 
-   Deux planchers resserrés, dans cet ordre de priorité. La rosace cède la
-   première : c'est une synthèse, elle se lit plus petite, et son
-   `preserveAspectRatio` la remet à l'échelle sans la déformer ni casser ses
-   marges. La liste des mitigations garde un peu plus de plancher : sous
-   140 px elle ne montre plus assez de lignes pour servir. Et si les trois
-   panneaux ne tiennent toujours pas, c'est la colonne entière qui défile,
-   plutôt qu'un panneau qui disparaît en silence. */
+   Planchers resserrés. La rosace cède la première : c'est une synthèse, elle
+   se lit plus petite, et son `preserveAspectRatio` la remet à l'échelle sans
+   la déformer ni casser ses marges. Mitigations et CVE, repliées par défaut,
+   ne demandent de toute façon que leur en-tête ; seule celle des deux qu'on
+   ouvre reçoit un plancher, plus bas qu'en temps normal. Et si tout ça ne
+   tient toujours pas, c'est la colonne entière qui défile, plutôt qu'un
+   panneau qui disparaît en silence. */
 @media (max-height: 820px) {
     #dash-side {
-        grid-template-rows: minmax(120px, 1fr) minmax(140px, 1fr) auto;
+        grid-template-rows: minmax(180px, 1fr) auto auto;
         overflow-y: auto;
     }
+    #dash-side[data-open="mitigations"] { grid-template-rows: minmax(140px, 1fr) minmax(120px, 1fr) auto; }
+    #dash-side[data-open="cve"] { grid-template-rows: minmax(140px, 1fr) auto minmax(120px, 1fr); }
 
     /* La matrice défile déjà verticalement quand la hauteur manque — c'est le
        repli voulu, comme pour la largeur. Mais chaque case gardait son plancher

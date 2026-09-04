@@ -16,9 +16,11 @@
     --surface-3: #212734;
     --border: #2a3140;
     --border-strong: #3a4354;
-    /* Toile de la rosace. Bien plus claire que les bordures : sur fond sombre,
-       une toile au ton des cadres disparaît, et le tracé flotte sans repère. */
-    --toile: #e2e7f0;
+    /* Toile de la rosace. Plus claire que les bordures : sur fond sombre, une
+       toile au ton des cadres disparaît, et le tracé flotte sans repère. Mais
+       pas au ton du texte non plus — un fil aussi lumineux que ce qu'il porte
+       ne se distingue plus de ce qu'il y a à lire. */
+    --toile: #a3acbc;
     --text: #e8eaf0;
     --text-dim: #98a1b3;
     --text-mute: #6b7484;
@@ -124,7 +126,7 @@
         --surface-3: #efefeb;
         --border: #dcdcd5;
         --border-strong: #c3c2b7;
-        --toile: #46453f;
+        --toile: #504d47;
         --text: #0b0b0b;
         --text-dim: #52514e;
         --text-mute: #898781;
@@ -209,7 +211,7 @@
     --surface-3: #efefeb;
     --border: #dcdcd5;
     --border-strong: #c3c2b7;
-    --toile: #46453f;
+    --toile: #504d47;
     --text: #0b0b0b;
     --text-dim: #52514e;
     --text-mute: #898781;

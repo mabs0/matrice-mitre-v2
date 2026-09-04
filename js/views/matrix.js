@@ -32,6 +32,11 @@ const view = {
     platformsReady: false,
     showSubs: false,
     expanded: null,            // nom du panneau en plein écran, ou null
+    /* La rosace reste toujours affichée, assez grande pour lire les tactiques :
+       c'est mitigations et CVE qui se replient, un seul à la fois, pour lui
+       laisser la place — et à d'autres modules à venir. `null` : les deux
+       repliés, la rosace prend tout ce qui reste. */
+    openPanel: null,
     /* Deux façons de désigner ce qu'on veut voir ressortir dans la matrice, et
        elles s'excluent : la carte ne peut répondre qu'à une question à la fois.
        Choisir l'une éteint l'autre. */
@@ -63,6 +68,16 @@ const expandButton = nom => `
         </svg>
     </button>`;
 
+/** En-tête cliquable d'un panneau repliable — mitigations et CVE, pas la rosace. */
+const accordionHead = (nom, titre, ouvert) => `
+    <button class="panel-head accordion-head" data-accordion="${nom}" aria-expanded="${ouvert}">
+        <h2>${titre}</h2>
+        <svg class="ico-chevron" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M4 6l4 4 4-4" stroke="currentColor"
+                  stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+    </button>`;
+
 export function renderMatrix(app) {
     const { data } = app;
     // On n'initialise qu'une fois : sinon décocher toutes les plateformes serait
@@ -74,7 +89,7 @@ export function renderMatrix(app) {
 
     $("#view-matrix").innerHTML = `
         <div id="dash" ${view.expanded ? `data-expanded="${view.expanded}"` : ""}>
-            <div id="dash-side">
+            <div id="dash-side" ${view.openPanel ? `data-open="${view.openPanel}"` : ""}>
                 <section class="dash-panel" data-panel="rosace">
                     <div class="panel-head">
                         <h2>Maturité par tactique</h2>
@@ -87,14 +102,15 @@ export function renderMatrix(app) {
                     <div class="panel-body" id="dash-rosace"></div>
                 </section>
 
-                <section class="dash-panel" data-panel="mitigations">
-                    <div class="panel-head"><h2>Mitigations</h2>${expandButton("mitigations")}</div>
-                    <div class="panel-body" id="dash-mitigations"></div>
+                <section class="dash-panel accordion" data-panel="mitigations">
+                    ${accordionHead("mitigations", "Mitigations", view.openPanel === "mitigations")}
+                    <div class="panel-body${view.openPanel === "mitigations" ? "" : " hidden"}"
+                         id="dash-mitigations"></div>
                 </section>
 
-                <section class="dash-panel" data-panel="cve">
-                    <div class="panel-head"><h2>CVE</h2></div>
-                    <div class="panel-body">
+                <section class="dash-panel accordion" data-panel="cve">
+                    ${accordionHead("cve", "CVE", view.openPanel === "cve")}
+                    <div class="panel-body${view.openPanel === "cve" ? "" : " hidden"}" id="dash-cve-body">
                         <input type="search" id="dash-cve" placeholder="CVE-2021-44228"
                                autocomplete="off" spellcheck="false" aria-describedby="dash-cve-note">
                         <button class="cve-toggle" id="cve-heritees" type="button"
@@ -170,6 +186,9 @@ export function renderMatrix(app) {
     for (const button of $$("[data-expand]")) {
         button.onclick = () => toggleExpand(app, button.dataset.expand);
     }
+    for (const button of $$("[data-accordion]")) {
+        button.onclick = () => toggleAccordion(button.dataset.accordion);
+    }
     $("#rosace-export").onclick = () => exporterRosace(app);
 
     for (const id of ["platform", "method", "export"]) {
@@ -205,6 +224,26 @@ function toggleExpand(app, nom) {
     // La matrice change de régime de colonnes selon qu'elle est en plein écran
     // ou dans son panneau : il faut la redessiner.
     paint(app);
+}
+
+/**
+ * Ouvre un panneau repliable (mitigations ou CVE), referme l'autre : un seul
+ * à la fois, pour que la rosace garde toujours l'essentiel de la place.
+ * Re-cliquer sur celui déjà ouvert le referme et la colonne retombe à son état
+ * de repos, rosace seule.
+ */
+function toggleAccordion(nom) {
+    view.openPanel = view.openPanel === nom ? null : nom;
+    const dashSide = $("#dash-side");
+    if (view.openPanel) dashSide.dataset.open = view.openPanel;
+    else delete dashSide.dataset.open;
+
+    const corps = { mitigations: "#dash-mitigations", cve: "#dash-cve-body" };
+    for (const [cle, selecteur] of Object.entries(corps)) {
+        const ouvert = view.openPanel === cle;
+        $(`[data-accordion="${cle}"]`)?.setAttribute("aria-expanded", String(ouvert));
+        $(selecteur)?.classList.toggle("hidden", !ouvert);
+    }
 }
 
 /**
@@ -976,4 +1015,5 @@ export function resetMatrixView() {
     view.cve = null;
     view.cveEnCours = false;
     view.expanded = null;
+    view.openPanel = null;
 }

@@ -3043,6 +3043,39 @@ console.log("\n[35c] Le tableau de bord");
     ok("un panneau agrandi masque les autres",
        /#dash\[data-expanded="matrix"\] #dash-side[\s\S]{0,220}display:\s*none/.test(matrixCss));
 
+    /* --- mitigations et CVE se replient, la rosace reste toujours affichée --- */
+
+    const dashSide = window.document.getElementById("dash-side");
+    const teteMit = window.document.querySelector('[data-accordion="mitigations"]');
+    const teteCve = window.document.querySelector('[data-accordion="cve"]');
+    const corpsMit = window.document.getElementById("dash-mitigations");
+    const corpsCve = window.document.getElementById("dash-cve-body");
+
+    ok("les deux sont repliés au départ", !dashSide.dataset.open, dashSide.dataset.open);
+    ok("leurs deux corps sont masqués",
+       corpsMit.classList.contains("hidden") && corpsCve.classList.contains("hidden"));
+    ok("et leurs en-têtes le disent", teteMit.getAttribute("aria-expanded") === "false" &&
+       teteCve.getAttribute("aria-expanded") === "false");
+    ok("la rosace, elle, n'a pas d'en-tête repliable — elle reste toujours affichée",
+       !window.document.querySelector('[data-panel="rosace"] .accordion-head'));
+
+    teteMit.click();
+    ok("ouvrir les mitigations le dit sur #dash-side", dashSide.dataset.open === "mitigations");
+    ok("son corps redevient visible", !corpsMit.classList.contains("hidden"));
+    ok("et son en-tête le porte", teteMit.getAttribute("aria-expanded") === "true");
+    ok("le CVE, lui, reste replié", corpsCve.classList.contains("hidden"));
+
+    teteCve.click();
+    ok("ouvrir le CVE referme les mitigations : un seul à la fois",
+       dashSide.dataset.open === "cve" && corpsMit.classList.contains("hidden") &&
+       teteMit.getAttribute("aria-expanded") === "false");
+    ok("et le CVE, lui, s'ouvre", !corpsCve.classList.contains("hidden") &&
+       teteCve.getAttribute("aria-expanded") === "true");
+
+    teteCve.click();
+    ok("re-cliquer sur celui déjà ouvert le referme, la colonne retombe au repos",
+       !dashSide.dataset.open && corpsCve.classList.contains("hidden"));
+
     /* --- filtrer ne redessine pas ce qui ne change pas --- */
 
     // La rosace rejoue son animation de tracé à chaque reconstruction. Rattachée
