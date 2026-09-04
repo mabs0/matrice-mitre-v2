@@ -804,8 +804,8 @@
    L'opacité, elle, est un levier indépendant — le banc lit la couleur telle
    qu'écrite dans la feuille de style, pas le rendu une fois mélangé au fond —
    et adoucit le trait sans rouvrir ce risque-là. */
-.ros-spoke { stroke: var(--toile); stroke-width: 0.9; opacity: 0.5; }
-.ros-web { fill: none; stroke: var(--toile); stroke-width: 1.2; opacity: 0.45; }
+.ros-spoke { stroke: var(--toile); stroke-width: 0.8; opacity: 0.4; }
+.ros-web { fill: none; stroke: var(--toile); stroke-width: 1.2; opacity: 0.35; }
 .ros-web-group { animation: ros-fade 0.5s ease-out both; }
 
 .ros-tick {
