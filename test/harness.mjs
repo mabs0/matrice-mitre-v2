@@ -3899,6 +3899,28 @@ console.log("\n[46] Une CVE collée, des techniques allumées");
     ok("et jusqu'où va la table, pour qu'on ne la croie pas vivante",
        /Table figée au/.test(note()), note().slice(-90));
 
+    /* --- une sous-technique comptée mais sans case à qui s'allumer ---
+
+       T1078.001 est dans les directes de cette CVE, mais les sous-techniques
+       sont masquées par défaut : sa case n'existe pas, seule celle de T1078
+       (sa parente) s'allume. Sans le dire, « 2 directes » et une seule case
+       visiblement allumée se lirait comme un compte faux. */
+    const subsBox = window.document.getElementById("matrix-subs");
+    ok("une sous-technique du compte, sans case à elle, est signalée",
+       /1 sous-technique.*reste.*invisible/.test(note()), note().slice(-220));
+
+    subsBox.checked = true;
+    subsBox.dispatchEvent(new window.Event("change"));
+    ok("sa case apparaît et s'allume une fois les sous-techniques affichées",
+       allumee("T1078.001"), classesDe("T1078.001").join(" "));
+    ok("la mise en garde disparaît, il n'y a plus rien de masqué",
+       !/sous-technique/.test(note()), note().slice(-220));
+
+    subsBox.checked = false;
+    subsBox.dispatchEvent(new window.Event("change"));
+    ok("et revient quand on les recache",
+       /1 sous-technique.*reste.*invisible/.test(note()), note().slice(-220));
+
     bouton.click();
     ok("l'interrupteur allume les héritées", allumee("T1110"), classesDe("T1110").join(" "));
     ok("sans toucher aux directes", allumee("T1078"));

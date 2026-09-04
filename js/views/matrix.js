@@ -159,7 +159,12 @@ export function renderMatrix(app) {
 
     $("#matrix-search").oninput = e => { view.query = e.target.value.trim(); paint(app); };
     brancherCve(app);
-    $("#matrix-subs").onchange = e => { view.showSubs = e.target.checked; paint(app); };
+    // Le décompte du panneau CVE dépend lui aussi de la visibilité des
+    // sous-techniques (voir paintCve) : sans ce second appel, cocher ou
+    // décocher la case laissait la note « sous-techniques masquées » affichée
+    // à tort, ou disparaître à tort, jusqu'au prochain événement qui la
+    // recalculait par ailleurs.
+    $("#matrix-subs").onchange = e => { view.showSubs = e.target.checked; paint(app); paintCve(app); };
     $("#matrix-quiz").onclick = () => app.show("quiz");
 
     for (const button of $$("[data-expand]")) {
@@ -670,6 +675,18 @@ function paintCve(app, erreur = "") {
     }
 
     const total = cve.verifiees.length + cve.direct.length + (view.cveHeritees ? cve.heritees.length : 0);
+
+    // Le compte porte sur les identifiants, sous-techniques comprises : c'est
+    // ce qui est réellement établi. Mais la matrice, par défaut, ne montre pas
+    // les sous-techniques : leur case n'existe pas, seule celle de leur
+    // technique parente s'allume. Sans le dire, « 5 directes » et deux cases
+    // allumées se lirait comme une erreur de compte, alors que ce n'en est pas
+    // une, simplement des sous-techniques sans case à elles sur cet écran.
+    const estSousTechnique = t => t.includes(".");
+    const masquees = view.showSubs ? 0
+        : [...cve.verifiees, ...cve.direct, ...(view.cveHeritees ? cve.heritees : [])]
+              .filter(estSousTechnique).length;
+
     hote.innerHTML = `
         <p class="cve-bilan">
             <b>${esc(cve.id)}</b>
@@ -687,6 +704,10 @@ function paintCve(app, erreur = "") {
                 ${cve.heritees.length} héritée${cve.heritees.length > 1 ? "s" : ""}, depuis une famille
                 de faiblesses plus large${view.cveHeritees ? "" : ", non comptées ici"}</li>
         </ul>
+        ${masquees ? `<p class="panel-note">
+            ${masquees} sous-technique${masquees > 1 ? "s" : ""} du compte ${masquees > 1 ? "restent" : "reste"}
+            invisible${masquees > 1 ? "s" : ""} : la case de sa technique parente porte la surbrillance
+            à sa place. Cochez « Sous-techniques », dans la barre d'outils, pour les voir séparément.</p>` : ""}
         ${view.cvePerimetre ? `<p class="panel-note cve-fraicheur">
             Table figée au ${esc(dateCourte(view.cvePerimetre.genere))} :
             une CVE publiée depuis n'y figure pas.</p>` : ""}`;
