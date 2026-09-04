@@ -28,9 +28,14 @@
 
 #dash-side {
     display: grid;
-    /* La rosace prend la place qu'il lui faut, la liste des mitigations occupe
-       ce qui reste et défile, le bloc CVE tient sur sa hauteur propre. */
-    grid-template-rows: auto minmax(0, 1fr) auto;
+    /* La rosace et la liste des mitigations se partagent à égalité ce qui
+       reste une fois le bloc CVE posé sur sa hauteur propre (plafonnée plus
+       bas) — chacune a un plancher, aucune des deux ne peut retomber à rien.
+       La rosace en particulier tient toujours la hauteur exacte de sa ligne,
+       pas celle que son contenu réclame : c'est ce qui la fait dépendre de la
+       case plutôt que l'inverse, et se centrer avec des marges égales quelle
+       que soit cette hauteur (voir plus bas, `.rosace { height: 100% }`). */
+    grid-template-rows: minmax(220px, 1fr) minmax(0, 1fr) auto;
     gap: 10px;
     min-height: 0;
 }
@@ -64,11 +69,18 @@
 }
 
 .dash-panel .panel-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 12px 13px; }
-/* La rosace prend toute la largeur du panneau, marges réduites au minimum : la
-   couronne de libellés est déjà comprise dans son viewBox, il n'y a rien à
-   ajouter autour. */
-.dash-panel[data-panel="rosace"] .panel-body { overflow: visible; padding: 2px 2px 6px; }
-.dash-panel[data-panel="rosace"] .rosace { height: auto; width: 100%; }
+/* La rosace occupe toute la boîte que lui donne sa ligne de grille, quelle que
+   soit sa hauteur : `height: 100%` plutôt que `height: auto`, exactement comme
+   en plein écran plus bas. Le `preserveAspectRatio` par défaut du SVG
+   (« xMidYMid meet ») la centre alors tout seul dans ce qui reste après avoir
+   respecté ses proportions, à égale distance des bords des deux côtés qui ont
+   du jeu — plutôt qu'une marge fixée à la main qui ne le serait que pour une
+   taille de boîte donnée. `overflow: hidden` reprend la main si un très petit
+   panneau ne laissait plus la place aux libellés : ils se recouvrent avant de
+   déborder sur les panneaux voisins. */
+.dash-panel[data-panel="rosace"] .panel-body { overflow: hidden; padding: 8px; }
+.dash-panel[data-panel="rosace"] .rosace-figure { width: 100%; height: 100%; min-height: 0; }
+.dash-panel[data-panel="rosace"] .rosace { height: 100%; width: 100%; }
 
 /* Le panneau CVE grandissait sans plafond avec ce qu'il affiche : une CVE
    trouvée, vérifiée et détaillée peut y poser cinq lignes là où le champ vide
@@ -332,16 +344,16 @@
    panneau avec lequel on navigue dans l'évaluation : le tableau de bord était
    inutilisable sur un portable, et c'est ce qui a été remonté.
 
-   Trois règles, dans cet ordre de priorité. La rosace cède la première : c'est
-   une synthèse, elle se lit plus petite, et le `viewBox` la remet à l'échelle
-   sans la déformer. La liste des mitigations reçoit un plancher : sous 160 px
-   elle ne montre plus assez de lignes pour servir. Et si les trois panneaux ne
-   tiennent toujours pas, c'est la colonne entière qui défile, plutôt qu'un
-   panneau qui disparaît en silence. */
+   Deux planchers resserrés, dans cet ordre de priorité. La rosace cède la
+   première : c'est une synthèse, elle se lit plus petite, et son
+   `preserveAspectRatio` la remet à l'échelle sans la déformer ni casser ses
+   marges. La liste des mitigations garde un peu plus de plancher : sous
+   140 px elle ne montre plus assez de lignes pour servir. Et si les trois
+   panneaux ne tiennent toujours pas, c'est la colonne entière qui défile,
+   plutôt qu'un panneau qui disparaît en silence. */
 @media (max-height: 820px) {
-    .dash-panel[data-panel="rosace"] .rosace { max-height: 34vh; }
     #dash-side {
-        grid-template-rows: minmax(0, auto) minmax(160px, 1fr) minmax(0, auto);
+        grid-template-rows: minmax(120px, 1fr) minmax(140px, 1fr) auto;
         overflow-y: auto;
     }
 
